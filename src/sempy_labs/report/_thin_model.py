@@ -53,10 +53,17 @@ def get_thin_model_definition(
         status_codes=None,
         client="fabric_sp",
     )
-    return [
-        {"file_name": p["path"], "content": _decode_b64(p["payload"])}
-        for p in result["definition"]["parts"]
-    ]
+    
+    parts = []
+    for p in result["definition"]["parts"]:
+        try:
+            content = _decode_b64(p["payload"])
+        except UnicodeDecodeError:
+            # Binary files (images, etc.) - keep as base64
+            content = p["payload"]
+        parts.append({"file_name": p["path"], "content": content})
+    
+    return parts
 
 
 @log
