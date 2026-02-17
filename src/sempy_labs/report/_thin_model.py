@@ -16,6 +16,7 @@ from sempy_labs._helper_functions import (
 def get_thin_model_definition(
     report: str | UUID,
     workspace: Optional[str | UUID] = None,
+    include_binary_content: bool = False,
 ) -> list[dict]:
     """
     Returns the full definition of a thin report (live-connected report).
@@ -35,6 +36,10 @@ def get_thin_model_definition(
         The Fabric workspace name or ID.
         Defaults to None which resolves to the workspace of the attached lakehouse
         or if no lakehouse attached, resolves to the workspace of the notebook.
+    include_binary_content : bool, default=False
+        If True, includes binary files (images, icons) as base64-encoded content.
+        If False, only returns text-based definition files (definition.pbir, definition.json, etc.).
+        Binary files can be very large and may cause performance issues when printed or logged.
 
     Returns
     -------
@@ -58,10 +63,13 @@ def get_thin_model_definition(
     for p in result["definition"]["parts"]:
         try:
             content = _decode_b64(p["payload"])
+            parts.append({"file_name": p["path"], "content": content})
         except UnicodeDecodeError:
-            # Binary files (images, etc.) - keep as base64
-            content = p["payload"]
-        parts.append({"file_name": p["path"], "content": content})
+            # Binary files (images, etc.)
+            if include_binary_content:
+                content = p["payload"]
+                parts.append({"file_name": p["path"], "content": content})
+            # else: skip binary files
     
     return parts
 
