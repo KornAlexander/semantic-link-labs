@@ -34,6 +34,10 @@ from ._export_report import (
 from ._endorsement import (
     set_endorsement,
 )
+from ._thin_model import (
+    get_thin_model_definition,
+    set_thin_model_perspective,
+)
 
 __all__ = [
     "create_report_from_reportjson",
@@ -56,4 +60,6 @@ __all__ = [
     "save_report_as_pbip",
     "connect_report",
     "set_endorsement",
+    "get_thin_model_definition",
+    "set_thin_model_perspective",
 ]
