@@ -39,8 +39,8 @@ def get_thin_model_definition(
     Returns
     -------
     list of dict
-        A list of definition file parts, each with keys ``file_name``, ``content``, and ``is_binary``.
-        Binary files have ``is_binary=True`` and content is truncated or marked to avoid large payloads.
+        A list of definition file parts, each with keys ``file_name`` and ``content``.
+        Binary files with very large payloads are excluded to avoid performance issues.
     """
 
     workspace_name, workspace_id = resolve_workspace_name_and_id(workspace)
@@ -57,21 +57,19 @@ def get_thin_model_definition(
     
     parts = []
     for p in result["definition"]["parts"]:
+        # Skip very large binary payloads (>5MB) to avoid performance issues
+        if len(p["payload"]) > 5_000_000:
+            continue
+        
         try:
             content = _decode_b64(p["payload"])
             parts.append({
                 "file_name": p["path"],
-                "content": content,
-                "is_binary": False
+                "content": content
             })
         except UnicodeDecodeError:
-            # Binary file - don't include full base64 payload
-            parts.append({
-                "file_name": p["path"],
-                "content": f"[Binary file - {len(p['payload']) // 1024}KB base64 payload]",
-                "is_binary": True,
-                "payload_size_kb": len(p["payload"]) // 1024
-            })
+            # Binary file - skip it
+            pass
     
     return parts
 
