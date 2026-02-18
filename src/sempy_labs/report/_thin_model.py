@@ -16,6 +16,7 @@ from sempy_labs.report._reportwrapper import connect_report
 def get_thin_model_definition(
     report: str | UUID,
     workspace: Optional[str | UUID] = None,
+    exclude_static_resources: bool = True,
 ) -> list[dict]:
     """
     Returns the full definition of a thin report (live-connected report).
@@ -35,6 +36,9 @@ def get_thin_model_definition(
         The Fabric workspace name or ID.
         Defaults to None which resolves to the workspace of the attached lakehouse
         or if no lakehouse attached, resolves to the workspace of the notebook.
+    exclude_static_resources : bool, default=True
+        If True, excludes all files in the StaticResources folder (images, icons, themes).
+        If False, includes all definition files.
 
     Returns
     -------
@@ -47,6 +51,10 @@ def get_thin_model_definition(
         parts = []
         
         for file_path in paths_df["Path"]:
+            # Skip static resources if requested
+            if exclude_static_resources and file_path.startswith("StaticResources/"):
+                continue
+            
             content = rw.get(file_path=file_path)
             parts.append({
                 "file_name": file_path,
