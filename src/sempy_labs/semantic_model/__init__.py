@@ -7,7 +7,6 @@ from ._caching import (
     enable_query_caching,
 )
 
-
 __all__ = [
     "approved_for_copilot",
     "set_endorsement",
