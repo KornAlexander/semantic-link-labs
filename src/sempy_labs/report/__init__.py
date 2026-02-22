@@ -47,7 +47,7 @@ from ._Fix_BarChart import (
 from ._Fix_ColumnChart import (
     fix_columcharts,
 )
-from ._pbi_fixer import (
+from sempy_labs._pbi_fixer import (
     pbi_fixer,
 )
 
