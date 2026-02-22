@@ -38,8 +38,17 @@ from ._thin_model import (
     get_thin_model_definition,
     set_thin_model_perspective,
 )
-from ._PieChart_Fixer import (
-    fix_pie_charts,
+from ._Fix_PieChart import (
+    fix_piecharts,
+)
+from ._Fix_BarChart import (
+    fix_barcharts,
+)
+from ._Fix_ColumnChart import (
+    fix_columcharts,
+)
+from ._pbi_fixer import (
+    pbi_fixer,
 )
 
 __all__ = [
@@ -65,5 +74,8 @@ __all__ = [
     "set_endorsement",
     "get_thin_model_definition",
     "set_thin_model_perspective",
-    "fix_pie_charts",
+    "fix_piecharts",
+    "fix_barcharts",
+    "fix_columcharts",
+    "pbi_fixer",
 ]
