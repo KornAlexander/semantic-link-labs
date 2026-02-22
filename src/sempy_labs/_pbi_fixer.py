@@ -229,12 +229,12 @@ def pbi_fixer(
     # -----------------------------
     # SEMANTIC MODEL FIXERS
     # -----------------------------
-    cb_calendar = widgets.Checkbox(value=False, indent=False, layout=widgets.Layout(width="22px"))
-    cb_discourage = widgets.Checkbox(value=False, indent=False, layout=widgets.Layout(width="22px"))
-    cb_last_refresh = widgets.Checkbox(value=False, indent=False, layout=widgets.Layout(width="22px"))
-    cb_units = widgets.Checkbox(value=False, indent=False, layout=widgets.Layout(width="22px"))
-    cb_time_intel = widgets.Checkbox(value=False, indent=False, layout=widgets.Layout(width="22px"))
-    cb_measure_tbl = widgets.Checkbox(value=False, indent=False, layout=widgets.Layout(width="22px"))
+    cb_calendar = widgets.Checkbox(value=True, indent=False, layout=widgets.Layout(width="22px"))
+    cb_discourage = widgets.Checkbox(value=True, indent=False, layout=widgets.Layout(width="22px"))
+    cb_last_refresh = widgets.Checkbox(value=True, indent=False, layout=widgets.Layout(width="22px"))
+    cb_units = widgets.Checkbox(value=True, indent=False, layout=widgets.Layout(width="22px"))
+    cb_time_intel = widgets.Checkbox(value=True, indent=False, layout=widgets.Layout(width="22px"))
+    cb_measure_tbl = widgets.Checkbox(value=True, indent=False, layout=widgets.Layout(width="22px"))
 
     calendar_row = widgets.HBox(
         [cb_calendar, _fixer_label("Add Calendar Table", "adds \"CalcCalendar\" calculated table if no table has been \"marked\" as a date table")],
