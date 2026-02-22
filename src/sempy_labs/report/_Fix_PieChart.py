@@ -1,7 +1,12 @@
-# Fix Pie Chart Visuals in Power BI Reports
+#Fix Pie Chart Visuals in Power BI Reports
+#%pip install semantic-link-labs
 
 from uuid import UUID
 from typing import Optional
+from sempy_labs._helper_functions import (
+    resolve_workspace_name_and_id,
+    resolve_item_name_and_id,
+)
 from sempy._utils._log import log
 import sempy_labs._icons as icons
 from sempy_labs.report._reportwrapper import connect_report
@@ -44,9 +49,7 @@ def fix_piecharts(
         This function does not return a value.
     """
 
-    with connect_report(
-        report=report, workspace=workspace, readonly=scan_only, show_diffs=False
-    ) as rw:
+    with connect_report(report=report, workspace=workspace, readonly=scan_only, show_diffs=False) as rw:
         # Get all file paths in the report
         paths_df = rw.list_paths()
         pie_charts_found = 0
@@ -69,9 +72,7 @@ def fix_piecharts(
                 pie_charts_found += 1
 
                 if scan_only:
-                    print(
-                        f"{icons.yellow_dot} {file_path} — pie chart found (would be replaced with {target_visual_type})"
-                    )
+                    print(f"{icons.yellow_dot} {file_path} — pie chart found (would be replaced with {target_visual_type})")
                     continue
 
                 # Change the visual type to target type

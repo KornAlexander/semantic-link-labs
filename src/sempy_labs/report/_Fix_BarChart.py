@@ -1,4 +1,5 @@
-# Fix Bar Chart Visuals in Power BI Reports
+#Fix Bar Chart Visuals in Power BI Reports
+#%pip install semantic-link-labs
 
 from uuid import UUID
 from typing import Optional
@@ -7,25 +8,14 @@ import sempy_labs._icons as icons
 from sempy_labs.report._reportwrapper import connect_report
 
 
-def _get_visual_property(
-    visual: dict, object_name: str, property_name: str
-) -> str | None:
+def _get_visual_property(visual: dict, object_name: str, property_name: str) -> str | None:
     obj_list = visual.get("visual", {}).get("objects", {}).get(object_name, [])
     if not obj_list:
         return None
-    return (
-        obj_list[0]
-        .get("properties", {})
-        .get(property_name, {})
-        .get("expr", {})
-        .get("Literal", {})
-        .get("Value")
-    )
+    return obj_list[0].get("properties", {}).get(property_name, {}).get("expr", {}).get("Literal", {}).get("Value")
 
 
-def _set_visual_property(
-    visual: dict, object_name: str, property_name: str, value: str
-) -> None:
+def _set_visual_property(visual: dict, object_name: str, property_name: str, value: str) -> None:
     objects = visual.setdefault("visual", {}).setdefault("objects", {})
     if object_name not in objects or not objects[object_name]:
         objects[object_name] = [{"properties": {}}]
@@ -75,9 +65,7 @@ def fix_barcharts(
         This function does not return a value.
     """
 
-    with connect_report(
-        report=report, workspace=workspace, readonly=scan_only, show_diffs=False
-    ) as rw:
+    with connect_report(report=report, workspace=workspace, readonly=scan_only, show_diffs=False) as rw:
         paths_df = rw.list_paths()
         charts_found = 0
         charts_fixed = 0
@@ -109,11 +97,11 @@ def fix_barcharts(
 
             # Check which properties need fixing before applying any changes
             checks = [
-                ("valueAxis", "showAxisTitle", "false"),
-                ("valueAxis", "show", "false"),
-                ("categoryAxis", "showAxisTitle", "false"),
-                ("labels", "show", "true"),
-                ("valueAxis", "gridlineShow", "false"),
+                ("valueAxis",   "showAxisTitle", "false"),
+                ("valueAxis",   "show",          "false"),
+                ("categoryAxis","showAxisTitle",  "false"),
+                ("labels",      "show",           "true"),
+                ("valueAxis",   "gridlineShow",   "false"),
             ]
 
             issues = [
@@ -130,9 +118,7 @@ def fix_barcharts(
             charts_need_fixing += 1
 
             if scan_only:
-                print(
-                    f"{icons.yellow_dot} {file_path} — needs fixing: {', '.join(issues)}"
-                )
+                print(f"{icons.yellow_dot} {file_path} — needs fixing: {', '.join(issues)}")
                 continue
 
             for object_name, property_name, value in checks:
@@ -143,26 +129,16 @@ def fix_barcharts(
             print(f"{icons.green_dot} Fixed bar chart in {file_path}")
 
         if charts_found == 0:
-            print(
-                f"{icons.info} No bar charts found in the '{rw._report_name}' report."
-            )
+            print(f"{icons.info} No bar charts found in the '{rw._report_name}' report.")
         elif scan_only:
             if charts_need_fixing == 0:
-                print(
-                    f"\n{icons.green_dot} Scanned {charts_found} bar chart(s) — all have correct settings."
-                )
+                print(f"\n{icons.green_dot} Scanned {charts_found} bar chart(s) — all have correct settings.")
             else:
-                print(
-                    f"\n{icons.yellow_dot} Scanned {charts_found} bar chart(s) — {charts_need_fixing} need fixing."
-                )
+                print(f"\n{icons.yellow_dot} Scanned {charts_found} bar chart(s) — {charts_need_fixing} need fixing.")
         elif charts_fixed == 0:
-            print(
-                f"{icons.info} Found {charts_found} bar chart(s) in the '{rw._report_name}' report — all already have correct settings."
-            )
+            print(f"{icons.info} Found {charts_found} bar chart(s) in the '{rw._report_name}' report — all already have correct settings.")
         else:
-            print(
-                f"{icons.green_dot} Successfully fixed {charts_fixed} of {charts_found} bar chart(s)."
-            )
+            print(f"{icons.green_dot} Successfully fixed {charts_fixed} of {charts_found} bar chart(s).")
 
 
 # Sample usage:
