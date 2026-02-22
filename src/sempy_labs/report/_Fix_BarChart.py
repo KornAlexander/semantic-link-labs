@@ -1,3 +1,4 @@
+#Fix Bar Chart Visuals in Power BI Reports
 #%pip install semantic-link-labs
 
 from uuid import UUID
@@ -141,6 +142,6 @@ def fix_barcharts(
 
 
 # Sample usage:
-# fix_barcharts(report="PBI Fixer Testing")
-# fix_barcharts(report="PBI Fixer Testing", page_name="Sales Overview")
-# fix_barcharts(report="PBI Fixer Testing", page_name="Sales Overview", workspace="Your Workspace Name")
+# fix_barcharts(report="ReportName")
+# fix_barcharts(report="ReportName", page_name="PageName")
+# fix_barcharts(report="ReportName", page_name="PageName", workspace="Your Workspace Name")

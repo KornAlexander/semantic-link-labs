@@ -181,5 +181,5 @@ def fix_hide_visual_filters(
 
 # Sample usage:
 # fix_hide_visual_filters(report="My Report")
-# fix_hide_visual_filters(report="My Report", page_name="Overview")
+# fix_hide_visual_filters(report="My Report", page_name="PageName")
 # fix_hide_visual_filters(report="My Report", workspace="My Workspace", scan_only=True)

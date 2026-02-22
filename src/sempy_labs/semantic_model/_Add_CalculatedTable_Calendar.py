@@ -225,3 +225,8 @@ def add_calculated_calendar(
             f"'{dataset_name}' with {len(_COLUMNS)} columns and "
             f"{len(_HIERARCHIES)} hierarchies."
         )
+
+# Sample usage:
+# add_calculated_calendar(report="My Report")
+# add_calculated_calendar(report="My Report", workspace="My Workspace")
+# add_calculated_calendar(report="My Report", scan_only=True)

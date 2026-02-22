@@ -100,6 +100,7 @@ def fix_piecharts(
 
 
 # Sample usage:
-# fix_piecharts(report="PBI Fixer Testing")                                              # default: clusteredBarChart
-# fix_piecharts(report="PBI Fixer Testing", target_visual_type="barChart")
-# fix_piecharts(report="PBI Fixer Testing", page_name="Overview")                        # single page only
+# fix_piecharts(report="ReportName")                                              # default: clusteredBarChart
+# fix_piecharts(report="ReportName", target_visual_type="barChart")
+# fix_piecharts(report="ReportName", page_name="PageName")                        # single page only
+# fix_piecharts(report="ReportName", page_name="PageName", workspace="Your Workspace Name")
