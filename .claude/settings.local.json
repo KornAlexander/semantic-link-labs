@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \".agent_cache/resources/m-kovalsky/semantic-link-labs\" show 1f389d87f119d20b15df83517ce789f955391a4b --stat)",
+      "Bash(cd:*)",
+      "Bash(git -C \"c:\\\\Users\\\\alkorn\\\\OneDrive - Microsoft\\\\Dokumente\\\\07. VS Code\\\\01. Semantic Link Labs\\\\semantic-link-labs\" log --oneline feature/power-bi-fixer ^main)",
+      "Bash(git -C \"c:\\\\Users\\\\alkorn\\\\OneDrive - Microsoft\\\\Dokumente\\\\07. VS Code\\\\01. Semantic Link Labs\\\\semantic-link-labs\" log --oneline -10)"
+    ]
+  }
+}
