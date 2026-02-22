@@ -7,18 +7,17 @@ from contextlib import redirect_stdout
 from typing import Optional
 from uuid import UUID
 
-# Once published to sempy_labs, replace local function definitions with:
-# from sempy_labs.report._Fix_PieChart import fix_piecharts
-# from sempy_labs.report._Fix_BarChart import fix_barcharts
-# from sempy_labs.report._Fix_ColumnChart import fix_columcharts
-# from sempy_labs.report._Fix_PageSize import fix_page_size
-# from sempy_labs.report._Fix_HideVisualFilters import fix_hide_visual_filters
-# from sempy_labs.semantic_model._Add_CalculatedTable_Calendar import add_calculated_calendar
-# from sempy_labs.semantic_model._Fix_DiscourageImplicitMeasures import fix_discourage_implicit_measures
-# from sempy_labs.semantic_model._Add_Table_LastRefresh import add_last_refresh_table
-# from sempy_labs.semantic_model._Add_CalcGroup_Units import add_calc_group_units
-# from sempy_labs.semantic_model._Add_CalcGroup_TimeIntelligence import add_calc_group_time_intelligence
-# from sempy_labs.semantic_model._Add_CalculatedTable_MeasureTable import add_measure_table
+from sempy_labs.report._Fix_PieChart import fix_piecharts
+from sempy_labs.report._Fix_BarChart import fix_barcharts
+from sempy_labs.report._Fix_ColumnChart import fix_columncharts
+from sempy_labs.report._Fix_PageSize import fix_page_size
+from sempy_labs.report._Fix_HideVisualFilters import fix_hide_visual_filters
+from sempy_labs.semantic_model._Add_CalculatedTable_Calendar import add_calculated_calendar
+from sempy_labs.semantic_model._Fix_DiscourageImplicitMeasures import fix_discourage_implicit_measures
+from sempy_labs.semantic_model._Add_Table_LastRefresh import add_last_refresh_table
+from sempy_labs.semantic_model._Add_CalcGroup_Units import add_calc_group_units
+from sempy_labs.semantic_model._Add_CalcGroup_TimeIntelligence import add_calc_group_time_intelligence
+from sempy_labs.semantic_model._Add_CalculatedTable_MeasureTable import add_measure_table
 
 
 def pbi_fixer(
@@ -329,7 +328,7 @@ def pbi_fixer(
     report_fixers = [
         (cb_pie, "Fix Pie Charts",    lambda r, p, w, s: fix_piecharts(report=r, page_name=p, workspace=w, scan_only=s)),
         (cb_bar, "Fix Bar Charts",    lambda r, p, w, s: fix_barcharts(report=r, page_name=p, workspace=w, scan_only=s)),
-        (cb_col, "Fix Column Charts", lambda r, p, w, s: fix_columcharts(report=r, page_name=p, workspace=w, scan_only=s)),
+        (cb_col, "Fix Column Charts", lambda r, p, w, s: fix_columncharts(report=r, page_name=p, workspace=w, scan_only=s)),
         (cb_page_size, "Fix Page Size", lambda r, p, w, s: fix_page_size(report=r, page_name=p, workspace=w, scan_only=s)),
         (cb_hide_filters, "Hide Visual Filters", lambda r, p, w, s: fix_hide_visual_filters(report=r, page_name=p, workspace=w, scan_only=s)),
     ]

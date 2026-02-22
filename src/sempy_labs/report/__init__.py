@@ -45,7 +45,13 @@ from ._Fix_BarChart import (
     fix_barcharts,
 )
 from ._Fix_ColumnChart import (
-    fix_columcharts,
+    fix_columncharts,
+)
+from ._Fix_PageSize import (
+    fix_page_size,
+)
+from ._Fix_HideVisualFilters import (
+    fix_hide_visual_filters,
 )
 from sempy_labs._pbi_fixer import (
     pbi_fixer,
@@ -76,6 +82,8 @@ __all__ = [
     "set_thin_model_perspective",
     "fix_piecharts",
     "fix_barcharts",
-    "fix_columcharts",
+    "fix_columncharts",
+    "fix_page_size",
+    "fix_hide_visual_filters",
     "pbi_fixer",
 ]

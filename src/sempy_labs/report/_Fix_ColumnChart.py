@@ -29,7 +29,7 @@ _COLUMN_CHART_TYPES = {"columnChart", "clusteredColumnChart"}
 
 
 @log
-def fix_columcharts(
+def fix_columncharts(
     report: str | UUID,
     page_name: Optional[str] = None,
     workspace: Optional[str | UUID] = None,
@@ -141,6 +141,6 @@ def fix_columcharts(
 
 
 # Sample usage:
-# fix_columcharts(report="ReportName")
-# fix_columcharts(report="ReportName", page_name="PageName")
-# fix_columcharts(report="ReportName", page_name="PageName", workspace="Your Workspace Name")
+# fix_columncharts(report="ReportName")
+# fix_columncharts(report="ReportName", page_name="PageName")
+# fix_columncharts(report="ReportName", page_name="PageName", workspace="Your Workspace Name")
