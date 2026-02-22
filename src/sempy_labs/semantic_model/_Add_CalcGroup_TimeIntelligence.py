@@ -61,7 +61,7 @@ def _build_calc_items(cal: str, date: str) -> list:
             "YTD",
             f"CALCULATE(\n"
             f"    SELECTEDMEASURE(),\n"
-            f'    DATESYTD( \'{cal}\'[{date}], "12/31" ),\n'
+            f"    DATESYTD( '{cal}'[{date}], \"12/31\" ),\n"
             f"    ALL( '{cal}' )\n"
             f")",
         ),
@@ -69,7 +69,7 @@ def _build_calc_items(cal: str, date: str) -> list:
             "YTD-1",
             f"CALCULATE(\n"
             f"    SELECTEDMEASURE(),\n"
-            f'    DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -1, YEAR ),\n'
+            f"    DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -1, YEAR ),\n"
             f"    ALL( '{cal}' )\n"
             f")",
         ),
@@ -77,7 +77,7 @@ def _build_calc_items(cal: str, date: str) -> list:
             "YTD-2",
             f"CALCULATE(\n"
             f"    SELECTEDMEASURE(),\n"
-            f'    DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -2, YEAR ),\n'
+            f"    DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -2, YEAR ),\n"
             f"    ALL( '{cal}' )\n"
             f")",
         ),
@@ -85,36 +85,36 @@ def _build_calc_items(cal: str, date: str) -> list:
         (
             "abs. AC vs Y-1",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y1 =\n"
-            f'    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -1, YEAR ), ALL( \'{cal}\' ) )\n'
+            f"    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -1, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
             f"    AC - Y1",
         ),
         (
             "abs. AC vs Y-2",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y2 =\n"
-            f'    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -2, YEAR ), ALL( \'{cal}\' ) )\n'
+            f"    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -2, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
             f"    AC - Y2",
         ),
         (
             "abs. AC vs YTD-1",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y1 =\n"
-            f'    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -1, YEAR ), ALL( \'{cal}\' ) )\n'
+            f"    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -1, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
             f"    AC - Y1",
         ),
         (
             "abs. AC vs YTD-2",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y2 =\n"
-            f'    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -2, YEAR ), ALL( \'{cal}\' ) )\n'
+            f"    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -2, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
             f"    AC - Y2",
         ),
@@ -122,7 +122,7 @@ def _build_calc_items(cal: str, date: str) -> list:
         (
             "AC vs Y-1",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y1 =\n"
             f"    CALCULATE( SELECTEDMEASURE(), SAMEPERIODLASTYEAR( '{cal}'[{date}] ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
@@ -131,7 +131,7 @@ def _build_calc_items(cal: str, date: str) -> list:
         (
             "AC vs Y-2",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y2 =\n"
             f"    CALCULATE( SELECTEDMEASURE(), DATEADD( '{cal}'[{date}], -2, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
@@ -140,18 +140,18 @@ def _build_calc_items(cal: str, date: str) -> list:
         (
             "AC vs YTD-1",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y1 =\n"
-            f'    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -1, YEAR ), ALL( \'{cal}\' ) )\n'
+            f"    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -1, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
             f"    DIVIDE( AC - Y1, Y1 )",
         ),
         (
             "AC vs YTD-2",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y2 =\n"
-            f'    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -2, YEAR ), ALL( \'{cal}\' ) )\n'
+            f"    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -2, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
             f"    DIVIDE( AC - Y2, Y2 )",
         ),
@@ -177,18 +177,18 @@ def _build_calc_items(cal: str, date: str) -> list:
         (
             "achiev. AC vs YTD-1",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y1 =\n"
-            f'    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -1, YEAR ), ALL( \'{cal}\' ) )\n'
+            f"    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -1, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
             f"    1 - DIVIDE( ( Y1 - AC ), Y1, 0 )",
         ),
         (
             "achiev. AC vs YTD-2",
             f"VAR AC =\n"
-            f'    TOTALYTD( SELECTEDMEASURE(), DATESYTD( \'{cal}\'[{date}], "12/31" ), ALL( \'{cal}\' ) )\n'
+            f"    TOTALYTD( SELECTEDMEASURE(), DATESYTD( '{cal}'[{date}], \"12/31\" ), ALL( '{cal}' ) )\n"
             f"VAR Y2 =\n"
-            f'    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( \'{cal}\'[{date}], "12/31" ), -2, YEAR ), ALL( \'{cal}\' ) )\n'
+            f"    CALCULATE( SELECTEDMEASURE(), DATEADD( DATESYTD( '{cal}'[{date}], \"12/31\" ), -2, YEAR ), ALL( '{cal}' ) )\n"
             f"RETURN\n"
             f"    1 - DIVIDE( ( Y2 - AC ), Y2, 0 )",
         ),
@@ -233,7 +233,7 @@ def add_calc_group_time_intelligence(
     None
     """
 
-    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    workspace_name, workspace_id = resolve_workspace_name_and_id(workspace)
 
     dataset_id, dataset_name, dataset_workspace_id, dataset_workspace_name = (
         resolve_dataset_from_report(report=report, workspace=workspace_id)
@@ -247,9 +247,7 @@ def add_calc_group_time_intelligence(
 
         # Fuzzy match: any table whose name contains "time intelligence"
         ti_tables = [
-            t.Name
-            for t in tom.model.Tables
-            if "time intelligence" in t.Name.lower()
+            t.Name for t in tom.model.Tables if "time intelligence" in t.Name.lower()
         ]
 
         if ti_tables:

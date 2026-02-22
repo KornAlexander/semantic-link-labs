@@ -1,5 +1,4 @@
 # Add Calculated Calendar Table to Semantic Model
-# %pip install semantic-link-labs
 
 from uuid import UUID
 from typing import Optional
@@ -60,26 +59,206 @@ _BOOL_FMT = '"""TRUE"";""TRUE"";""FALSE"""'
 # Column definitions:
 #   (column_name, source_column, data_type, format_string, is_key, hidden, summarize_by, display_folder)
 _COLUMNS = [
-    ("Date",                        "CalcCalendar.[Date]",                        "DateTime", "Short Date",    True,  False, "None",    "1. Favorites"),
-    ("Month",                       "CalcCalendar.[Month]",                       "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
-    ("Fiscal Year",                 "CalcCalendar.[Fiscal Year]",                 "Int64",    "0",             False, False, "Sum",     "3. Fiscal Date\\2. Numbers;1. Favorites"),
-    ("Year",                        "CalcCalendar.[Year]",                        "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns;1. Favorites"),
-    ("Month (MMM)",                 "CalcCalendar.[Month (MMM)]",                 "String",   None,            False, False, "None",    "2. Calendar Date\\3. Text Columns;1. Favorites"),
-    ("Day",                         "CalcCalendar.[Day]",                         "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
-    ("Is Before This Month",        "CalcCalendar.[Is Before This Month]",        "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Current Fiscal Year",      "CalcCalendar.[Is Current Fiscal Year]",      "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Previous Fiscal Year",     "CalcCalendar.[Is Previous Fiscal Year]",     "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Current Calendar Year",    "CalcCalendar.[Is Current Calendar Year]",    "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Previous Calendar Year",   "CalcCalendar.[Is Previous Calendar Year]",   "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Current Month",            "CalcCalendar.[Is Current Month]",            "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Previous Month",           "CalcCalendar.[Is Previous Month]",           "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Year Month Key",              "CalcCalendar.[Month Key]",                   "Int64",    "0",             False, False, "Count",   "2. Calendar Date\\2. Number Columns"),
-    ("Relative Month",              "CalcCalendar.[Relative Month]",              "Int64",    "0",             False, False, "Sum",     "4. Flags"),
-    ("Quarter",                     "CalcCalendar.[Quarter]",                     "String",   None,            False, False, "None",    "2. Calendar Date\\3. Text Columns"),
-    ("End of Month",                "CalcCalendar.[End of Month]",                "DateTime", "General Date",  False, False, "None",    "2. Calendar Date\\2. Number Columns"),
-    ("Week of Year",                "CalcCalendar.[Week of Year]",                "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
-    ("Weekday",                     "CalcCalendar.[Weekday]",                     "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
-    ("Is Current or Past Months",   "CalcCalendar.[Is Current or Past Month]",    "String",   None,            False, False, "None",    "4. Flags"),
+    (
+        "Date",
+        "CalcCalendar.[Date]",
+        "DateTime",
+        "Short Date",
+        True,
+        False,
+        "None",
+        "1. Favorites",
+    ),
+    (
+        "Month",
+        "CalcCalendar.[Month]",
+        "Int64",
+        "0",
+        False,
+        False,
+        "Sum",
+        "2. Calendar Date\\2. Number Columns",
+    ),
+    (
+        "Fiscal Year",
+        "CalcCalendar.[Fiscal Year]",
+        "Int64",
+        "0",
+        False,
+        False,
+        "Sum",
+        "3. Fiscal Date\\2. Numbers;1. Favorites",
+    ),
+    (
+        "Year",
+        "CalcCalendar.[Year]",
+        "Int64",
+        "0",
+        False,
+        False,
+        "Sum",
+        "2. Calendar Date\\2. Number Columns;1. Favorites",
+    ),
+    (
+        "Month (MMM)",
+        "CalcCalendar.[Month (MMM)]",
+        "String",
+        None,
+        False,
+        False,
+        "None",
+        "2. Calendar Date\\3. Text Columns;1. Favorites",
+    ),
+    (
+        "Day",
+        "CalcCalendar.[Day]",
+        "Int64",
+        "0",
+        False,
+        False,
+        "Sum",
+        "2. Calendar Date\\2. Number Columns",
+    ),
+    (
+        "Is Before This Month",
+        "CalcCalendar.[Is Before This Month]",
+        "Boolean",
+        _BOOL_FMT,
+        False,
+        False,
+        "None",
+        "4. Flags",
+    ),
+    (
+        "Is Current Fiscal Year",
+        "CalcCalendar.[Is Current Fiscal Year]",
+        "Boolean",
+        _BOOL_FMT,
+        False,
+        False,
+        "None",
+        "4. Flags",
+    ),
+    (
+        "Is Previous Fiscal Year",
+        "CalcCalendar.[Is Previous Fiscal Year]",
+        "Boolean",
+        _BOOL_FMT,
+        False,
+        False,
+        "None",
+        "4. Flags",
+    ),
+    (
+        "Is Current Calendar Year",
+        "CalcCalendar.[Is Current Calendar Year]",
+        "Boolean",
+        _BOOL_FMT,
+        False,
+        False,
+        "None",
+        "4. Flags",
+    ),
+    (
+        "Is Previous Calendar Year",
+        "CalcCalendar.[Is Previous Calendar Year]",
+        "Boolean",
+        _BOOL_FMT,
+        False,
+        False,
+        "None",
+        "4. Flags",
+    ),
+    (
+        "Is Current Month",
+        "CalcCalendar.[Is Current Month]",
+        "Boolean",
+        _BOOL_FMT,
+        False,
+        False,
+        "None",
+        "4. Flags",
+    ),
+    (
+        "Is Previous Month",
+        "CalcCalendar.[Is Previous Month]",
+        "Boolean",
+        _BOOL_FMT,
+        False,
+        False,
+        "None",
+        "4. Flags",
+    ),
+    (
+        "Year Month Key",
+        "CalcCalendar.[Month Key]",
+        "Int64",
+        "0",
+        False,
+        False,
+        "Count",
+        "2. Calendar Date\\2. Number Columns",
+    ),
+    (
+        "Relative Month",
+        "CalcCalendar.[Relative Month]",
+        "Int64",
+        "0",
+        False,
+        False,
+        "Sum",
+        "4. Flags",
+    ),
+    (
+        "Quarter",
+        "CalcCalendar.[Quarter]",
+        "String",
+        None,
+        False,
+        False,
+        "None",
+        "2. Calendar Date\\3. Text Columns",
+    ),
+    (
+        "End of Month",
+        "CalcCalendar.[End of Month]",
+        "DateTime",
+        "General Date",
+        False,
+        False,
+        "None",
+        "2. Calendar Date\\2. Number Columns",
+    ),
+    (
+        "Week of Year",
+        "CalcCalendar.[Week of Year]",
+        "Int64",
+        "0",
+        False,
+        False,
+        "Sum",
+        "2. Calendar Date\\2. Number Columns",
+    ),
+    (
+        "Weekday",
+        "CalcCalendar.[Weekday]",
+        "Int64",
+        "0",
+        False,
+        False,
+        "Sum",
+        "2. Calendar Date\\2. Number Columns",
+    ),
+    (
+        "Is Current or Past Months",
+        "CalcCalendar.[Is Current or Past Month]",
+        "String",
+        None,
+        False,
+        False,
+        "None",
+        "4. Flags",
+    ),
 ]
 
 # Sort-by-column mappings: (column_name, sort_by_column_name)
@@ -89,9 +268,24 @@ _SORT_BY = [
 
 # Hierarchy definitions: (hierarchy_name, [columns], [levels], display_folder)
 _HIERARCHIES = [
-    ("Date Hierarchy",        ["Year", "Quarter", "Month", "Day"],                None, "2. Calendar Date\\1. Hierarchy"),
-    ("Fiscal Date Hierarchy", ["Fiscal Year", "Quarter", "Month", "Day"],         None, "3. Fiscal Date\\1. Hierarchy"),
-    ("Calendar Hierarchy",    ["Year", "Month (MMM)", "Week of Year", "Weekday"], None, "1. Favorites"),
+    (
+        "Date Hierarchy",
+        ["Year", "Quarter", "Month", "Day"],
+        None,
+        "2. Calendar Date\\1. Hierarchy",
+    ),
+    (
+        "Fiscal Date Hierarchy",
+        ["Fiscal Year", "Quarter", "Month", "Day"],
+        None,
+        "3. Fiscal Date\\1. Hierarchy",
+    ),
+    (
+        "Calendar Hierarchy",
+        ["Year", "Month (MMM)", "Week of Year", "Weekday"],
+        None,
+        "1. Favorites",
+    ),
 ]
 
 
@@ -124,7 +318,7 @@ def add_calculated_calendar(
     None
     """
 
-    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    workspace_name, workspace_id = resolve_workspace_name_and_id(workspace)
 
     # Resolve the semantic model behind this report
     dataset_id, dataset_name, dataset_workspace_id, dataset_workspace_name = (
@@ -138,9 +332,7 @@ def add_calculated_calendar(
     ) as tom:
 
         # Check for any table with DataCategory == "Time"
-        time_tables = [
-            t.Name for t in tom.model.Tables if t.DataCategory == "Time"
-        ]
+        time_tables = [t.Name for t in tom.model.Tables if t.DataCategory == "Time"]
 
         if time_tables:
             table_list = ", ".join(f"'{t}'" for t in time_tables)
@@ -178,7 +370,16 @@ def add_calculated_calendar(
         )
 
         # 2. Add all columns (with display folders)
-        for col_name, source_col, data_type, fmt, is_key, hidden, summarize, folder in _COLUMNS:
+        for (
+            col_name,
+            source_col,
+            data_type,
+            fmt,
+            is_key,
+            hidden,
+            summarize,
+            folder,
+        ) in _COLUMNS:
             tom.add_calculated_table_column(
                 table_name=_CAL_TABLE_NAME,
                 column_name=col_name,
@@ -218,13 +419,16 @@ def add_calculated_calendar(
                 levels=levels,
             )
             # Set display folder on the hierarchy object
-            tom.model.Tables[_CAL_TABLE_NAME].Hierarchies[hier_name].DisplayFolder = folder
+            tom.model.Tables[_CAL_TABLE_NAME].Hierarchies[
+                hier_name
+            ].DisplayFolder = folder
 
         print(
             f"{icons.green_dot} CalcCalendar table added successfully to "
             f"'{dataset_name}' with {len(_COLUMNS)} columns and "
             f"{len(_HIERARCHIES)} hierarchies."
         )
+
 
 # Sample usage:
 # add_calculated_calendar(report="My Report")

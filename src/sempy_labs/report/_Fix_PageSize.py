@@ -47,7 +47,9 @@ def fix_page_size(
     None
     """
 
-    with connect_report(report=report, workspace=workspace, readonly=scan_only, show_diffs=False) as rw:
+    with connect_report(
+        report=report, workspace=workspace, readonly=scan_only, show_diffs=False
+    ) as rw:
         paths_df = rw.list_paths()
         pages_found = 0
         pages_default = 0
@@ -96,9 +98,7 @@ def fix_page_size(
                     )
 
         if pages_found == 0:
-            print(
-                f"{icons.info} No pages found in the '{rw._report_name}' report."
-            )
+            print(f"{icons.info} No pages found in the '{rw._report_name}' report.")
         elif scan_only:
             if pages_default == 0:
                 print(

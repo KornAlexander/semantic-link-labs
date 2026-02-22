@@ -17,7 +17,7 @@ from sempy_labs.tom import connect_semantic_model
 _LR_TABLE_NAME = "Last Refresh"
 
 _M_EXPRESSION = (
-    'let\n'
+    "let\n"
     '    #"Today" = #table({"Last Refreshes"}, '
     "{{DateTime.From(DateTime.LocalNow())}})\n"
     "in\n"
@@ -25,7 +25,7 @@ _M_EXPRESSION = (
 )
 
 _MEASURE_NAME = "Last Refresh Measure"
-_MEASURE_EXPRESSION = '"Last Refresh: " & MAX(\'Last Refresh\'[Last Refreshes])'
+_MEASURE_EXPRESSION = "\"Last Refresh: \" & MAX('Last Refresh'[Last Refreshes])"
 _MEASURE_DISPLAY_FOLDER = "Meta"
 
 
@@ -58,7 +58,7 @@ def add_last_refresh_table(
     None
     """
 
-    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    workspace_name, workspace_id = resolve_workspace_name_and_id(workspace)
 
     dataset_id, dataset_name, dataset_workspace_id, dataset_workspace_name = (
         resolve_dataset_from_report(report=report, workspace=workspace_id)
@@ -72,9 +72,7 @@ def add_last_refresh_table(
 
         # Fuzzy match: any table whose name contains "refresh"
         refresh_tables = [
-            t.Name
-            for t in tom.model.Tables
-            if "refresh" in t.Name.lower()
+            t.Name for t in tom.model.Tables if "refresh" in t.Name.lower()
         ]
 
         if refresh_tables:
@@ -128,9 +126,7 @@ def add_last_refresh_table(
 
         # 4. Add the measure — prefer the "Measure" table if it exists
         measure_tables = [
-            t.Name
-            for t in tom.model.Tables
-            if "measure" in t.Name.lower()
+            t.Name for t in tom.model.Tables if "measure" in t.Name.lower()
         ]
         measure_target = measure_tables[0] if measure_tables else _LR_TABLE_NAME
 

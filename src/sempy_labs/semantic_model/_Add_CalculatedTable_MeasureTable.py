@@ -50,7 +50,7 @@ def add_measure_table(
     None
     """
 
-    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    workspace_name, workspace_id = resolve_workspace_name_and_id(workspace)
 
     dataset_id, dataset_name, dataset_workspace_id, dataset_workspace_name = (
         resolve_dataset_from_report(report=report, workspace=workspace_id)
@@ -64,9 +64,7 @@ def add_measure_table(
 
         # Fuzzy match: any table whose name contains "measure"
         measure_tables = [
-            t.Name
-            for t in tom.model.Tables
-            if "measure" in t.Name.lower()
+            t.Name for t in tom.model.Tables if "measure" in t.Name.lower()
         ]
 
         if measure_tables:

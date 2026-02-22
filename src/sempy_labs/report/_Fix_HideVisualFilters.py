@@ -70,7 +70,9 @@ def fix_hide_visual_filters(
     None
     """
 
-    with connect_report(report=report, workspace=workspace, readonly=scan_only, show_diffs=False) as rw:
+    with connect_report(
+        report=report, workspace=workspace, readonly=scan_only, show_diffs=False
+    ) as rw:
         paths_df = rw.list_paths()
         visuals_checked = 0
         visuals_need_fixing = 0
@@ -88,7 +90,9 @@ def fix_hide_visual_filters(
             visual = rw.get(file_path=file_path)
 
             # Skip visuals without a query (text boxes, shapes, images, etc.)
-            query_state = visual.get("visual", {}).get("query", {}).get("queryState", {})
+            query_state = (
+                visual.get("visual", {}).get("query", {}).get("queryState", {})
+            )
             if not query_state:
                 continue
 
@@ -99,13 +103,12 @@ def fix_hide_visual_filters(
 
             if filters:
                 # filterConfig exists — check if any filter is NOT hidden
-                visible = [
-                    f for f in filters
-                    if not f.get("isHiddenInViewMode", False)
-                ]
+                visible = [f for f in filters if not f.get("isHiddenInViewMode", False)]
                 if not visible:
                     if scan_only:
-                        print(f"{icons.green_dot} {file_path} — all filters already hidden")
+                        print(
+                            f"{icons.green_dot} {file_path} — all filters already hidden"
+                        )
                     continue
 
                 visuals_need_fixing += 1
@@ -138,12 +141,14 @@ def fix_hide_visual_filters(
 
                 new_filters = []
                 for field_dict, filter_type in extracted:
-                    new_filters.append({
-                        "name": "",
-                        "field": field_dict,
-                        "type": filter_type,
-                        "isHiddenInViewMode": True,
-                    })
+                    new_filters.append(
+                        {
+                            "name": "",
+                            "field": field_dict,
+                            "type": filter_type,
+                            "isHiddenInViewMode": True,
+                        }
+                    )
 
                 visual["filterConfig"] = {"filters": new_filters}
 
