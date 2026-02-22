@@ -295,6 +295,7 @@ def pbi_fixer(
 
     for _cb in _sm_checkboxes:
         _cb.observe(_on_sm_cb_change, names="value")
+    _on_sm_cb_change()  # evaluate initial state so warning shows if checkboxes start checked
 
     semantic_model_box = widgets.VBox(
         [_section_heading("Semantic Model"), discourage_row, calendar_row, last_refresh_row, measure_tbl_row, units_row, time_intel_row, sm_warning_confirm],
