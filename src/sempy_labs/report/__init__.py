@@ -56,6 +56,9 @@ from ._Fix_HideVisualFilters import (
 from ._Fix_UpgradeToPbir import (
     fix_upgrade_to_pbir,
 )
+from ._upgrade_to_pbir import (
+    upgrade_to_pbir,
+)
 from sempy_labs._pbi_fixer import (
     pbi_fixer,
 )
@@ -89,5 +92,6 @@ __all__ = [
     "fix_page_size",
     "fix_hide_visual_filters",
     "fix_upgrade_to_pbir",
+    "upgrade_to_pbir",
     "pbi_fixer",
 ]
