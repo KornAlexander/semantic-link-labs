@@ -53,6 +53,9 @@ from ._Fix_PageSize import (
 from ._Fix_HideVisualFilters import (
     fix_hide_visual_filters,
 )
+from ._Fix_UpgradeToPbir import (
+    fix_upgrade_to_pbir,
+)
 from sempy_labs._pbi_fixer import (
     pbi_fixer,
 )
@@ -85,5 +88,6 @@ __all__ = [
     "fix_columncharts",
     "fix_page_size",
     "fix_hide_visual_filters",
+    "fix_upgrade_to_pbir",
     "pbi_fixer",
 ]
