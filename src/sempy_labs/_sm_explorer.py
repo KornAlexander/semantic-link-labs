@@ -210,7 +210,7 @@ def _get_preview_text(model_data, key):
     return ""
 
 
-def sm_explorer_tab(workspace_input=None, report_input=None):
+def sm_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=None):
     """Build the Semantic Model Explorer tab widget."""
     _model_data = {}
     _key_map = {}
@@ -220,9 +220,17 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
     load_btn = widgets.Button(description="Load Model", button_style="primary", layout=widgets.Layout(width="110px"))
     expand_btn = widgets.Button(description="Expand All", layout=widgets.Layout(width="100px"))
     collapse_btn = widgets.Button(description="Collapse All", layout=widgets.Layout(width="100px"))
+
+    fixer_callbacks = fixer_callbacks or {}
+    fixer_dropdown = widgets.Dropdown(
+        options=["Actions..."] + list(fixer_callbacks.keys()),
+        value="Actions...",
+        layout=widgets.Layout(width="200px"),
+    )
+
     conn_status = status_html()
     load_row = widgets.HBox(
-        [load_btn, expand_btn, collapse_btn, conn_status],
+        [load_btn, expand_btn, collapse_btn, fixer_dropdown, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
@@ -471,5 +479,36 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
     collapse_btn.on_click(on_collapse_all)
     save_expr_btn.on_click(on_save_expr)
     save_props_btn.on_click(on_save_props)
+
+    def on_fixer_action(change):
+        action = change.get("new")
+        if action == "Actions..." or action not in fixer_callbacks:
+            return
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        ds = report_input.value.strip() if report_input else ""
+        if not ds:
+            set_status(conn_status, "No model loaded.", "#ff3b30")
+            fixer_dropdown.value = "Actions..."
+            return
+        set_status(conn_status, f"Running {action}\u2026", GRAY_COLOR)
+        try:
+            import io as _io
+            from contextlib import redirect_stdout as _redirect
+            buf = _io.StringIO()
+            with _redirect(buf):
+                fixer_callbacks[action](report=ds, workspace=ws, scan_only=False)
+            captured = buf.getvalue().rstrip()
+            msg = f"\u2713 {action} complete."
+            if captured:
+                # Show first line of output in status
+                first_line = captured.splitlines()[0][:80]
+                msg += f" {first_line}"
+            set_status(conn_status, msg, "#34c759")
+        except Exception as e:
+            set_status(conn_status, f"Error: {e}", "#ff3b30")
+        fixer_dropdown.value = "Actions..."
+
+    fixer_dropdown.observe(on_fixer_action, names="value")
 
     return widgets.VBox([load_row, tree_header, panels], layout=widgets.Layout(padding="12px", gap="4px"))
