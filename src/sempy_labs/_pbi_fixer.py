@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 
 import ipywidgets as widgets
 import io
@@ -625,9 +625,23 @@ def pbi_fixer(
         )
         tab_panels.append(sm_content)
 
+    # Build fixer callbacks for report explorer actions dropdown
+    _fixer_cbs = {}
+    if fix_piecharts is not None:
+        _fixer_cbs["Fix Pie Charts"] = lambda **kw: fix_piecharts(**kw)
+    if fix_barcharts is not None:
+        _fixer_cbs["Fix Bar Charts"] = lambda **kw: fix_barcharts(**kw)
+    if fix_columncharts is not None:
+        _fixer_cbs["Fix Column Charts"] = lambda **kw: fix_columncharts(**kw)
+    if fix_page_size is not None:
+        _fixer_cbs["Fix Page Size"] = lambda **kw: fix_page_size(**kw)
+    if fix_hide_visual_filters is not None:
+        _fixer_cbs["Hide Visual Filters"] = lambda **kw: fix_hide_visual_filters(**kw)
+
     if report_explorer_tab is not None:
         rpt_content = report_explorer_tab(
-            workspace_input=workspace_input, report_input=report_input
+            workspace_input=workspace_input, report_input=report_input,
+            fixer_callbacks=_fixer_cbs,
         )
         tab_panels.append(rpt_content)
 

@@ -1,5 +1,5 @@
 # Report Explorer tab for PBI Fixer.
-# Provides a tree view of report pages and visuals.
+# Provides a tree view of report pages and visuals with preview and properties.
 
 import ipywidgets as widgets
 
@@ -15,49 +15,18 @@ from sempy_labs._ui_components import (
     create_three_panel_layout,
     status_html,
     set_status,
-    placeholder_panel,
     panel_box,
 )
 
 
 def _load_report_data(report, workspace):
-    """
-    Connect to a report (read-only) and pre-fetch page/visual metadata
-    into a plain Python dict.  The report connection is closed after loading.
-
-    Returns
-    -------
-    dict  with structure:
-        {
-            "pages": {
-                "<PageName>": {
-                    "display_name": str,
-                    "width": int,
-                    "height": int,
-                    "hidden": bool,
-                    "visual_count": int,
-                    "visuals": {
-                        "<VisualName>": {
-                            "type": str,
-                            "display_type": str,
-                            "x": int, "y": int,
-                            "width": int, "height": int,
-                            "hidden": bool,
-                            "title": str,
-                        },
-                    },
-                },
-            },
-            "format": str,  # "PBIR" | "PBIRLegacy" | ...
-        }
-    """
+    """Load report structure via connect_report."""
     from sempy_labs.report import connect_report
 
     report_data = {"pages": {}, "format": ""}
 
     with connect_report(report=report, readonly=True, workspace=workspace) as rw:
         report_data["format"] = str(getattr(rw, "format", ""))
-
         pages_df = rw.list_pages()
         visuals_df = rw.list_visuals()
 
@@ -78,11 +47,9 @@ def _load_report_data(report, workspace):
             p_name = str(row.get("Page Name", row.get("Page Display Name", "")))
             if p_name not in report_data["pages"]:
                 continue
-
             v_name = str(row.get("Visual Name", ""))
             v_type = str(row.get("Type", ""))
             display_type = str(row.get("Display Type", v_type))
-
             report_data["pages"][p_name]["visuals"][v_name] = {
                 "type": v_type,
                 "display_type": display_type,
@@ -98,12 +65,6 @@ def _load_report_data(report, workspace):
 
 
 def _build_tree(report_data, expanded_pages):
-    """
-    Build tree items from the pre-fetched report data dict.
-    Only includes visuals of pages that are in ``expanded_pages``.
-
-    Returns (options, key_map).
-    """
     items = []
     for p_name in report_data["pages"]:
         p = report_data["pages"][p_name]
@@ -114,10 +75,8 @@ def _build_tree(report_data, expanded_pages):
         items.append(
             (0, "page", f"{marker} {p['display_name']}{hidden_suffix}  [{v_count} visuals]", f"page:{p_name}")
         )
-
         if not is_expanded:
             continue
-
         for v_name in sorted(p["visuals"]):
             v = p["visuals"][v_name]
             label = v["display_type"] or v["type"]
@@ -126,109 +85,163 @@ def _build_tree(report_data, expanded_pages):
             if v["hidden"]:
                 label += " (hidden)"
             items.append((1, "visual", label, f"visual:{p_name}:{v_name}"))
-
     return build_tree_items(items)
 
 
-def report_explorer_tab(workspace_input=None, report_input=None):
+def _prop_row(label, value):
+    return (
+        f'<tr><td style="padding:3px 10px 3px 0; font-weight:600; color:#555; '
+        f'white-space:nowrap; vertical-align:top;">{label}</td>'
+        f'<td style="padding:3px 0; word-break:break-word;">{value}</td></tr>'
+    )
+
+
+def _props_table(rows_html):
+    return (
+        f'<table style="font-size:13px; font-family:{FONT_FAMILY}; '
+        f'border-collapse:collapse; width:100%;">'
+        f'{rows_html}</table>'
+    )
+
+
+def _get_preview_html(report_data, key):
+    """Return preview HTML for pages and visuals."""
+    parts = key.split(":", 2)
+    node_type = parts[0]
+
+    if node_type == "page":
+        p = report_data["pages"].get(parts[1], {})
+        rows = _prop_row("Page", p.get("display_name", parts[1]))
+        rows += _prop_row("Size", f"{p.get('width', 0)} \u00d7 {p.get('height', 0)}")
+        rows += _prop_row("Hidden", str(p.get("hidden", False)))
+        rows += _prop_row("Visuals", str(len(p.get("visuals", {}))))
+        # Visual type summary
+        type_counts = {}
+        for v in p.get("visuals", {}).values():
+            dt = v.get("display_type") or v.get("type", "unknown")
+            type_counts[dt] = type_counts.get(dt, 0) + 1
+        if type_counts:
+            summary = ", ".join(f"{count}\u00d7 {t}" for t, count in sorted(type_counts.items(), key=lambda x: -x[1]))
+            rows += _prop_row("Visual Types", summary)
+        return _props_table(rows)
+
+    if node_type == "visual":
+        p_name, v_name = parts[1], parts[2] if len(parts) > 2 else ""
+        v = report_data["pages"].get(p_name, {}).get("visuals", {}).get(v_name, {})
+        rows = _prop_row("Visual", v.get("display_type") or v.get("type", ""))
+        if v.get("title"):
+            rows += _prop_row("Title", v["title"])
+        rows += _prop_row("Page", report_data["pages"].get(p_name, {}).get("display_name", p_name))
+        rows += _prop_row("Position", f"x={v.get('x', 0)}, y={v.get('y', 0)}")
+        rows += _prop_row("Size", f"{v.get('width', 0)} \u00d7 {v.get('height', 0)}")
+        rows += _prop_row("Hidden", str(v.get("hidden", False)))
+        rows += _prop_row("Internal Name", v_name)
+        return _props_table(rows)
+
+    return ""
+
+
+def _get_properties_html(report_data, key):
+    """Return properties HTML for the bottom-right panel."""
+    parts = key.split(":", 2)
+    node_type = parts[0]
+
+    if node_type == "page":
+        p = report_data["pages"].get(parts[1], {})
+        rows = _prop_row("Display Name", p.get("display_name", parts[1]))
+        rows += _prop_row("Internal Name", parts[1])
+        rows += _prop_row("Width", str(p.get("width", 0)))
+        rows += _prop_row("Height", str(p.get("height", 0)))
+        rows += _prop_row("Hidden", str(p.get("hidden", False)))
+        rows += _prop_row("Visual Count", str(len(p.get("visuals", {}))))
+        return _props_table(rows)
+
+    if node_type == "visual":
+        p_name = parts[1]
+        v_name = parts[2] if len(parts) > 2 else ""
+        v = report_data["pages"].get(p_name, {}).get("visuals", {}).get(v_name, {})
+        rows = _prop_row("Type", v.get("type", ""))
+        rows += _prop_row("Display Type", v.get("display_type", ""))
+        if v.get("title"):
+            rows += _prop_row("Title", v["title"])
+        rows += _prop_row("Internal Name", v_name)
+        rows += _prop_row("X", str(v.get("x", 0)))
+        rows += _prop_row("Y", str(v.get("y", 0)))
+        rows += _prop_row("Width", str(v.get("width", 0)))
+        rows += _prop_row("Height", str(v.get("height", 0)))
+        rows += _prop_row("Hidden", str(v.get("hidden", False)))
+        rows += _prop_row("Page", report_data["pages"].get(p_name, {}).get("display_name", p_name))
+        return _props_table(rows)
+
+    return ""
+
+
+def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=None):
     """
     Build the Report Explorer tab widget.
 
     Parameters
     ----------
-    workspace_input : widgets.Text
-        Shared workspace text input widget (reads .value on Load).
-    report_input : widgets.Text
-        Shared report text input widget (reads .value on Load).
-
-    Returns
-    -------
-    widgets.VBox
+    fixer_callbacks : dict, optional
+        Mapping of fixer label -> callable(report, page, workspace, scan_only).
     """
-    # -- state --
     _report_data = {}
     _key_map = {}
-    _expanded = set()  # set of page names currently expanded
+    _expanded = set()
+    _current_key = [None]
 
-    # -- Load button + status row --
-    load_btn = widgets.Button(
-        description="Load Report",
-        button_style="primary",
-        layout=widgets.Layout(width="110px"),
+    load_btn = widgets.Button(description="Load Report", button_style="primary", layout=widgets.Layout(width="110px"))
+    expand_btn = widgets.Button(description="Expand All", layout=widgets.Layout(width="100px"))
+    collapse_btn = widgets.Button(description="Collapse All", layout=widgets.Layout(width="100px"))
+
+    # Fixer action dropdown
+    fixer_callbacks = fixer_callbacks or {}
+    fixer_dropdown = widgets.Dropdown(
+        options=["Actions..."] + list(fixer_callbacks.keys()),
+        value="Actions...",
+        layout=widgets.Layout(width="200px"),
     )
-    expand_btn = widgets.Button(
-        description="Expand All",
-        layout=widgets.Layout(width="100px"),
-    )
-    collapse_btn = widgets.Button(
-        description="Collapse All",
-        layout=widgets.Layout(width="100px"),
-    )
+    fixer_dropdown.layout.display = "" if fixer_callbacks else "none"
+
     conn_status = status_html()
     load_row = widgets.HBox(
-        [load_btn, expand_btn, collapse_btn, conn_status],
+        [load_btn, expand_btn, collapse_btn, fixer_dropdown, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
-    # -- tree --
-    tree = widgets.Select(
-        options=[],
-        rows=28,
-        layout=widgets.Layout(
-            width="320px",
-            height="500px",
-            font_family="monospace",
-        ),
-    )
+    tree = widgets.Select(options=[], rows=28, layout=widgets.Layout(width="320px", height="500px", font_family="monospace"))
 
     def _refresh_tree(preserve_selection=None):
         nonlocal _key_map
         options, _key_map = _build_tree(_report_data, _expanded)
         tree.unobserve(on_select, names="value")
         tree.options = options
-        if preserve_selection and preserve_selection in options:
-            tree.value = preserve_selection
-        else:
-            tree.value = None
+        tree.value = preserve_selection if (preserve_selection and preserve_selection in options) else None
         tree.observe(on_select, names="value")
 
-    # -- preview placeholder (top-right) --
+    # -- preview (top-right) --
     preview_label = widgets.HTML(
-        value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; '
-        f'font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; '
-        f'margin-bottom:2px;">Preview</div>'
+        value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Preview</div>'
     )
-    preview_placeholder = widgets.HTML(
-        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; '
-        f'font-family:{FONT_FAMILY}; text-align:center; '
-        f'font-style:italic;">Preview \u2014 coming soon</div>',
+    preview_html = widgets.HTML(
+        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY}; font-style:italic;">Select a page or visual to see details</div>',
     )
-    preview_box = panel_box([preview_label, preview_placeholder], flex="1", min_height="250px")
+    preview_box = panel_box([preview_label, preview_html], flex="1", min_height="200px")
 
-    # -- properties placeholder (bottom-right) --
+    # -- properties (bottom-right) --
     props_label = widgets.HTML(
-        value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; '
-        f'font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; '
-        f'margin-bottom:2px;">Properties</div>'
+        value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Properties</div>'
     )
-    props_placeholder = widgets.HTML(
-        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; '
-        f'font-family:{FONT_FAMILY}; text-align:center; '
-        f'font-style:italic;">Properties \u2014 coming soon</div>',
+    props_html = widgets.HTML(
+        value=f'<div style="padding:12px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY}; font-style:italic;">Select an object to view properties</div>',
     )
-    props_box = panel_box([props_label, props_placeholder], flex="0 0 auto", min_height="150px")
+    props_box = panel_box([props_label, props_html], flex="0 0 auto", min_height="150px")
 
-    # -- three-panel layout --
     panels = create_three_panel_layout(tree, preview_box, props_box)
-
-    # -- tree label --
     tree_header = widgets.HTML(
-        value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; '
-        f'font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; '
-        f'margin-bottom:2px;">Report Structure</div>'
+        value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Report Structure</div>'
     )
 
-    # -- handlers --
     def on_load(_):
         nonlocal _report_data, _key_map
         _expanded.clear()
@@ -238,24 +251,17 @@ def report_explorer_tab(workspace_input=None, report_input=None):
         if not rpt:
             set_status(conn_status, "Enter a report name in the top bar.", "#ff3b30")
             return
-
         load_btn.disabled = True
-        load_btn.description = "Loading…"
-        set_status(conn_status, "Connecting…", GRAY_COLOR)
-
+        load_btn.description = "Loading\u2026"
+        set_status(conn_status, "Connecting\u2026", GRAY_COLOR)
         try:
             _report_data = _load_report_data(report=rpt, workspace=ws)
             _refresh_tree()
-
             n_pages = len(_report_data["pages"])
             n_visuals = sum(len(p["visuals"]) for p in _report_data["pages"].values())
             fmt = _report_data.get("format", "")
             fmt_str = f" ({fmt})" if fmt else ""
-            set_status(
-                conn_status,
-                f"Loaded: {n_pages} pages, {n_visuals} visuals{fmt_str}",
-                "#34c759",
-            )
+            set_status(conn_status, f"Loaded: {n_pages} pages, {n_visuals} visuals{fmt_str}", "#34c759")
         except Exception as e:
             set_status(conn_status, f"Error: {e}", "#ff3b30")
         finally:
@@ -267,6 +273,7 @@ def report_explorer_tab(workspace_input=None, report_input=None):
         if not selected or selected not in _key_map:
             return
         key = _key_map[selected]
+        _current_key[0] = key
         if key.startswith("page:"):
             p_name = key.split(":", 1)[1]
             if p_name in _expanded:
@@ -274,6 +281,8 @@ def report_explorer_tab(workspace_input=None, report_input=None):
             else:
                 _expanded.add(p_name)
             _refresh_tree(preserve_selection=selected)
+        preview_html.value = _get_preview_html(_report_data, key)
+        props_html.value = _get_properties_html(_report_data, key)
 
     def on_expand_all(_):
         if _report_data:
@@ -285,16 +294,35 @@ def report_explorer_tab(workspace_input=None, report_input=None):
         if _report_data:
             _refresh_tree()
 
+    def on_fixer_action(change):
+        action = change.get("new")
+        if action == "Actions..." or action not in fixer_callbacks:
+            return
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        rpt = report_input.value.strip() if report_input else ""
+        if not rpt:
+            set_status(conn_status, "No report loaded.", "#ff3b30")
+            fixer_dropdown.value = "Actions..."
+            return
+        page = None
+        key = _current_key[0]
+        if key and key.startswith("page:"):
+            page = key.split(":", 1)[1]
+        elif key and key.startswith("visual:"):
+            page = key.split(":")[1]
+        set_status(conn_status, f"Running {action}\u2026", GRAY_COLOR)
+        try:
+            fixer_callbacks[action](report=rpt, page_name=page, workspace=ws, scan_only=False)
+            set_status(conn_status, f"\u2713 {action} complete.", "#34c759")
+        except Exception as e:
+            set_status(conn_status, f"Error: {e}", "#ff3b30")
+        fixer_dropdown.value = "Actions..."
+
     load_btn.on_click(on_load)
     tree.observe(on_select, names="value")
     expand_btn.on_click(on_expand_all)
     collapse_btn.on_click(on_collapse_all)
+    fixer_dropdown.observe(on_fixer_action, names="value")
 
-    # -- assemble --
-    return widgets.VBox(
-        [load_row, tree_header, panels],
-        layout=widgets.Layout(
-            padding="12px",
-            gap="4px",
-        ),
-    )
+    return widgets.VBox([load_row, tree_header, panels], layout=widgets.Layout(padding="12px", gap="4px"))
