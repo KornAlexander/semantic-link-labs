@@ -639,4 +639,5 @@ def sm_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=Non
 
     fixer_dropdown.observe(on_fixer_action, names="value")
 
-    return widgets.VBox([load_row, tree_header, panels], layout=widgets.Layout(padding="12px", gap="4px"))
+    widget = widgets.VBox([load_row, tree_header, panels], layout=widgets.Layout(padding="12px", gap="4px"))
+    return widget, on_load
