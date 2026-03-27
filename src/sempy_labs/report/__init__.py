@@ -41,6 +41,9 @@ from ._items import (
     list_reports,
     get_report,
 )
+from sempy_labs._pbi_fixer import (
+    pbi_fixer,
+)
 
 __all__ = [
     "create_report_from_reportjson",
@@ -66,4 +69,5 @@ __all__ = [
     "upgrade_to_pbir",
     "list_reports",
     "get_report",
+    "pbi_fixer",
 ]
