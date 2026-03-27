@@ -3,6 +3,7 @@
 # properties, and fixer action dropdown.
 
 import ipywidgets as widgets
+import time
 
 from sempy_labs._ui_components import (
     FONT_FAMILY,
@@ -18,6 +19,24 @@ from sempy_labs._ui_components import (
     set_status,
     panel_box,
 )
+
+_LOAD_TIMEOUT = 300  # 5 minutes
+
+
+def _list_workspace_reports(workspace):
+    """List all report names in a workspace via REST API."""
+    from sempy_labs._helper_functions import (
+        resolve_workspace_name_and_id,
+        _base_api,
+    )
+    _, ws_id = resolve_workspace_name_and_id(workspace)
+    url = f"/v1.0/myorg/groups/{ws_id}/reports"
+    response = _base_api(request=url, client="fabric_sp")
+    return [
+        (r.get("name"), r.get("format", ""))
+        for r in response.json().get("value", [])
+        if r.get("name")
+    ]
 
 
 def _load_report_data(report, workspace):
@@ -218,13 +237,35 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
         _expanded.clear()
         ws = workspace_input.value.strip() if workspace_input else None
         ws = ws or None
-        rpt = report_input.value.strip() if report_input else ""
-        if not rpt:
-            set_status(conn_status, "Enter a report name in the top bar.", "#ff3b30")
-            return
+        rpt_input = report_input.value.strip() if report_input else ""
+
+        # Parse comma-separated items, or list all if blank
+        if rpt_input:
+            items = [x.strip() for x in rpt_input.split(",") if x.strip()]
+        else:
+            load_btn.disabled = True
+            load_btn.description = "Listing\u2026"
+            set_status(conn_status, "Listing reports\u2026", GRAY_COLOR)
+            try:
+                rpt_list = _list_workspace_reports(ws)
+                items = [name for name, _ in rpt_list]
+            except Exception as e:
+                set_status(conn_status, f"Error listing reports: {e}", "#ff3b30")
+                load_btn.disabled = False
+                load_btn.description = "Load Report"
+                return
+            if not items:
+                set_status(conn_status, "No reports found in workspace.", "#ff9500")
+                load_btn.disabled = False
+                load_btn.description = "Load Report"
+                return
+
+        # For multiple reports, load only the first one into preview
+        # (powerbiclient can only show one report at a time)
+        rpt = items[0]
         load_btn.disabled = True
         load_btn.description = "Loading\u2026"
-        set_status(conn_status, "Connecting\u2026", GRAY_COLOR)
+        set_status(conn_status, f"Loading '{rpt}'\u2026", GRAY_COLOR)
         try:
             _report_data = _load_report_data(report=rpt, workspace=ws)
             _refresh_tree()
@@ -232,7 +273,8 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
             n_visuals = sum(len(p["visuals"]) for p in _report_data["pages"].values())
             fmt = _report_data.get("format", "")
             fmt_str = f" ({fmt})" if fmt else ""
-            set_status(conn_status, f"Loaded: {n_pages} pages, {n_visuals} visuals{fmt_str}", "#34c759")
+            extra = f" (1 of {len(items)})" if len(items) > 1 else ""
+            set_status(conn_status, f"Loaded: {n_pages} pages, {n_visuals} visuals{fmt_str}{extra}", "#34c759")
             # Initialize powerbiclient Report widget
             report_id = _report_data.get("report_id", "")
             workspace_id = _report_data.get("workspace_id", "")
