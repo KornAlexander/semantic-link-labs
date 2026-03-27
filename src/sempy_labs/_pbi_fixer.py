@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.0.7"
+__version__ = "1.1.0"
 
 import ipywidgets as widgets
 import io
@@ -67,6 +67,16 @@ try:
     from sempy_labs.semantic_model._Add_CalculatedTable_MeasureTable import add_measure_table
 except ImportError:
     add_measure_table = None
+
+try:
+    from sempy_labs._sm_explorer import sm_explorer_tab
+except ImportError:
+    sm_explorer_tab = None
+
+try:
+    from sempy_labs._report_explorer import report_explorer_tab
+except ImportError:
+    report_explorer_tab = None
 
 
 def pbi_fixer(
@@ -576,7 +586,8 @@ def pbi_fixer(
         f'margin-top:8px;">Version: {__version__}</div>'
     )
 
-    container = widgets.VBox(
+    # -- Fixer tab content (existing UI) --
+    fixer_content = widgets.VBox(
         [
             header,
             mode_row,
@@ -586,10 +597,32 @@ def pbi_fixer(
             button_row,
             progress,
             status,
-            version_footer,
         ],
+        layout=widgets.Layout(padding="8px"),
+    )
+
+    # -- Build Tab widget --
+    tab_children = [fixer_content]
+    tab_titles = ["\u26A1 Fixer"]
+
+    if sm_explorer_tab is not None:
+        sm_tab = sm_explorer_tab(workspace=workspace, dataset=report)
+        tab_children.append(sm_tab)
+        tab_titles.append("\U0001F4CA Semantic Model")
+
+    if report_explorer_tab is not None:
+        rpt_tab = report_explorer_tab(workspace=workspace, report=report)
+        tab_children.append(rpt_tab)
+        tab_titles.append("\U0001F4C4 Report")
+
+    tab = widgets.Tab(children=tab_children)
+    for i, title in enumerate(tab_titles):
+        tab.set_title(i, title)
+
+    container = widgets.VBox(
+        [tab, version_footer],
         layout=widgets.Layout(
-            width="800px",
+            width="900px",
             padding="20px",
             border=f"1px solid {border_color}",
             border_radius="12px",
