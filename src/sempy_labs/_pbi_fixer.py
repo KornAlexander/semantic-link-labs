@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.12"
+__version__ = "1.2.13"
 
 import ipywidgets as widgets
 import io
@@ -124,7 +124,7 @@ def pbi_fixer(
     workspace: Optional[str | UUID] = None,
     report: Optional[str | UUID] = None,
     page_name: Optional[str] = None,
-    show_fixer_tab: bool = True,
+    show_fixer_tab: bool = False,
 ):
     """
     Launches an interactive UI for scanning and fixing Power BI report visuals.
@@ -140,9 +140,9 @@ def pbi_fixer(
         Pre-populates the report input field.
     page_name : str, default=None
         The display name of the page. Pre-populates the page input field.
-    show_fixer_tab : bool, default=True
-        If False, the Fixer tab is hidden. Fixers remain accessible via
-        action dropdowns in the Report and Semantic Model Explorer tabs.
+    show_fixer_tab : bool, default=False
+        If True, shows the Fixer tab. By default hidden since all fixers
+        are accessible via action dropdowns in the Report and SM tabs.
     """
 
     # -----------------------------
