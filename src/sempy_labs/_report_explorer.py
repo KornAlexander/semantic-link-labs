@@ -191,9 +191,13 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
     preview_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Preview</div>'
     )
-    preview_output = widgets.Output(layout=widgets.Layout(width="100%", min_height="350px"))
+    preview_placeholder = widgets.HTML(
+        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY}; font-style:italic;">Load a report to see the live preview</div>',
+    )
     _report_widget = [None]  # mutable container for powerbiclient Report
-    preview_box = panel_box([preview_label, preview_output], flex="1", min_height="380px")
+    # Use a VBox as the container — we swap its children to show the Report widget
+    preview_content = widgets.VBox([preview_placeholder], layout=widgets.Layout(width="100%", min_height="350px"))
+    preview_box = panel_box([preview_label, preview_content], flex="1", min_height="380px")
 
     # -- properties (bottom-right) --
     props_label = widgets.HTML(
@@ -235,15 +239,14 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
             if report_id and workspace_id:
                 try:
                     from powerbiclient import Report as PBIReport
-                    _report_widget[0] = PBIReport(group_id=workspace_id, report_id=report_id)
-                    preview_output.clear_output(wait=True)
-                    with preview_output:
-                        from IPython.display import display
-                        display(_report_widget[0])
+                    rpt_widget = PBIReport(group_id=workspace_id, report_id=report_id)
+                    rpt_widget.layout = widgets.Layout(width="100%", height="400px")
+                    _report_widget[0] = rpt_widget
+                    preview_content.children = [rpt_widget]
                 except Exception as embed_err:
-                    preview_output.clear_output(wait=True)
-                    with preview_output:
-                        print(f"Preview: {embed_err}")
+                    preview_content.children = [widgets.HTML(
+                        value=f'<div style="padding:12px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY};">Preview error: {embed_err}</div>'
+                    )]
         except Exception as e:
             set_status(conn_status, f"Error: {e}", "#ff3b30")
         finally:
