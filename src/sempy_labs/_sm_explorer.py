@@ -11,11 +11,14 @@ from sempy_labs._ui_components import (
     ICON_ACCENT,
     SECTION_BG,
     ICONS,
+    EXPANDED,
+    COLLAPSED,
     build_tree_items,
     create_three_panel_layout,
     status_html,
     set_status,
     placeholder_panel,
+    panel_box,
 )
 
 
@@ -120,22 +123,28 @@ def _load_model_data(dataset, workspace):
     return model_data
 
 
-def _build_tree(model_data):
+def _build_tree(model_data, expanded_tables):
     """
     Build tree items from the pre-fetched model data dict.
+    Only includes children of tables that are in ``expanded_tables``.
 
-    Returns (options, key_map)  where key_map values encode the node type
-    and identity as  "type:table:name"  strings.
+    Returns (options, key_map).
     """
     items = []
     for t_name in sorted(model_data["tables"]):
         t = model_data["tables"][t_name]
         t_type = t["type"]
         icon = "calc_group" if t_type == "CalculationGroup" else "table"
+        is_expanded = t_name in expanded_tables
+        marker = EXPANDED if is_expanded else COLLAPSED
         suffix = ""
         if t["is_hidden"]:
             suffix = " (hidden)"
-        items.append((0, icon, f"{t_name}{suffix}", f"table:{t_name}"))
+        child_count = len(t["measures"]) + len(t["columns"]) + len(t["hierarchies"]) + len(t["calc_items"])
+        items.append((0, icon, f"{marker} {t_name}{suffix}  [{child_count}]", f"table:{t_name}"))
+
+        if not is_expanded:
+            continue
 
         # Measures first (most commonly browsed)
         for m_name in sorted(t["measures"]):
@@ -292,6 +301,7 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
     # -- state --
     _model_data = {}
     _key_map = {}
+    _expanded = set()  # set of table names currently expanded
 
     # -- Load button + status row --
     load_btn = widgets.Button(
@@ -299,9 +309,17 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
         button_style="primary",
         layout=widgets.Layout(width="110px"),
     )
+    expand_btn = widgets.Button(
+        description="Expand All",
+        layout=widgets.Layout(width="100px"),
+    )
+    collapse_btn = widgets.Button(
+        description="Collapse All",
+        layout=widgets.Layout(width="100px"),
+    )
     conn_status = status_html()
     load_row = widgets.HBox(
-        [load_btn, conn_status],
+        [load_btn, expand_btn, collapse_btn, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
@@ -316,27 +334,32 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
         ),
     )
 
-    # -- preview (top-right) --
+    def _refresh_tree(preserve_selection=None):
+        nonlocal _key_map
+        options, _key_map = _build_tree(_model_data, _expanded)
+        tree.unobserve(on_select, names="value")
+        tree.options = options
+        if preserve_selection and preserve_selection in options:
+            tree.value = preserve_selection
+        else:
+            tree.value = None
+        tree.observe(on_select, names="value")
+
+    # -- preview (top-right, editable) --
     preview = widgets.Textarea(
         value="Select a measure to view its DAX expression.",
-        disabled=True,
         layout=widgets.Layout(
             width="100%",
             height="300px",
             font_family="monospace",
-            border=f"1px solid {BORDER_COLOR}",
-            border_radius="8px",
         ),
     )
     preview_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; '
         f'font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; '
-        f'margin-bottom:2px;">Preview</div>'
+        f'margin-bottom:2px;">Expression</div>'
     )
-    preview_box = widgets.VBox(
-        [preview_label, preview],
-        layout=widgets.Layout(flex="1"),
-    )
+    preview_box = panel_box([preview_label, preview], flex="1")
 
     # -- properties (bottom-right, dynamic HTML) --
     props_label = widgets.HTML(
@@ -348,17 +371,7 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
         value=f'<div style="padding:12px; color:{GRAY_COLOR}; font-size:13px; '
         f'font-family:{FONT_FAMILY}; font-style:italic;">Select an object to view properties</div>',
     )
-    props_box = widgets.VBox(
-        [props_label, props_html],
-        layout=widgets.Layout(
-            flex="0 0 auto",
-            border=f"1px solid {BORDER_COLOR}",
-            border_radius="8px",
-            padding="8px",
-            min_height="150px",
-            background_color=SECTION_BG,
-        ),
-    )
+    props_box = panel_box([props_label, props_html], flex="0 0 auto", min_height="150px")
 
     # -- three-panel layout --
     panels = create_three_panel_layout(tree, preview_box, props_box)
@@ -373,6 +386,7 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
     # -- handlers --
     def on_load(_):
         nonlocal _model_data, _key_map
+        _expanded.clear()
         ws = workspace_input.value.strip() if workspace_input else None
         ws = ws or None
         ds = report_input.value.strip() if report_input else ""
@@ -386,9 +400,7 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
 
         try:
             _model_data = _load_model_data(dataset=ds, workspace=ws)
-            options, _key_map = _build_tree(_model_data)
-            tree.options = options
-            tree.value = None
+            _refresh_tree()
 
             n_tables = len(_model_data["tables"])
             n_measures = sum(len(t["measures"]) for t in _model_data["tables"].values())
@@ -403,18 +415,38 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
             set_status(conn_status, f"Error: {e}", "#ff3b30")
         finally:
             load_btn.disabled = False
-            load_btn.description = "Load"
+            load_btn.description = "Load Model"
 
     def on_select(change):
         selected = change.get("new")
         if not selected or selected not in _key_map:
             return
         key = _key_map[selected]
+        # Toggle expand/collapse if a table row was clicked
+        if key.startswith("table:"):
+            t_name = key.split(":", 1)[1]
+            if t_name in _expanded:
+                _expanded.discard(t_name)
+            else:
+                _expanded.add(t_name)
+            _refresh_tree(preserve_selection=selected)
         preview.value = _get_preview_text(_model_data, key)
         props_html.value = _get_properties_html(_model_data, key)
 
+    def on_expand_all(_):
+        if _model_data:
+            _expanded.update(_model_data["tables"].keys())
+            _refresh_tree()
+
+    def on_collapse_all(_):
+        _expanded.clear()
+        if _model_data:
+            _refresh_tree()
+
     load_btn.on_click(on_load)
     tree.observe(on_select, names="value")
+    expand_btn.on_click(on_expand_all)
+    collapse_btn.on_click(on_collapse_all)
 
     # -- assemble --
     return widgets.VBox(

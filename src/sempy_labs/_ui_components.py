@@ -31,6 +31,10 @@ ICONS = {
     "relationship": "\u2194",      # ↔
 }
 
+# Collapse/expand markers
+EXPANDED = "\u25BC"   # ▼
+COLLAPSED = "\u25B6"  # ▶
+
 # Indentation string per level (using non-breaking spaces for Select widget)
 _INDENT = "\u00A0\u00A0\u00A0\u00A0"  # 4 nbsp per level
 
@@ -142,3 +146,20 @@ def placeholder_panel(text, min_height="120px"):
             background_color=SECTION_BG,
         ),
     )
+
+
+def panel_box(children, flex="1", min_height=None):
+    """
+    Consistent styled panel (used for preview and properties boxes).
+    Ensures both panels have the same border, background, and radius.
+    """
+    layout_args = {
+        "flex": flex,
+        "border": f"1px solid {BORDER_COLOR}",
+        "border_radius": "8px",
+        "padding": "8px",
+        "background_color": SECTION_BG,
+    }
+    if min_height:
+        layout_args["min_height"] = min_height
+    return widgets.VBox(children, layout=widgets.Layout(**layout_args))

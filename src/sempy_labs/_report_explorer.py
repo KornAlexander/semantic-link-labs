@@ -9,11 +9,14 @@ from sempy_labs._ui_components import (
     GRAY_COLOR,
     ICON_ACCENT,
     ICONS,
+    EXPANDED,
+    COLLAPSED,
     build_tree_items,
     create_three_panel_layout,
     status_html,
     set_status,
     placeholder_panel,
+    panel_box,
 )
 
 
@@ -94,21 +97,26 @@ def _load_report_data(report, workspace):
     return report_data
 
 
-def _build_tree(report_data):
+def _build_tree(report_data, expanded_pages):
     """
     Build tree items from the pre-fetched report data dict.
+    Only includes visuals of pages that are in ``expanded_pages``.
 
-    Returns (options, key_map)  where key_map values encode the node type
-    as  "type:page:visual"  strings.
+    Returns (options, key_map).
     """
     items = []
     for p_name in report_data["pages"]:
         p = report_data["pages"][p_name]
+        is_expanded = p_name in expanded_pages
+        marker = EXPANDED if is_expanded else COLLAPSED
         hidden_suffix = " (hidden)" if p["hidden"] else ""
         v_count = len(p["visuals"])
         items.append(
-            (0, "page", f"{p['display_name']}{hidden_suffix}  [{v_count} visuals]", f"page:{p_name}")
+            (0, "page", f"{marker} {p['display_name']}{hidden_suffix}  [{v_count} visuals]", f"page:{p_name}")
         )
+
+        if not is_expanded:
+            continue
 
         for v_name in sorted(p["visuals"]):
             v = p["visuals"][v_name]
@@ -140,6 +148,7 @@ def report_explorer_tab(workspace_input=None, report_input=None):
     # -- state --
     _report_data = {}
     _key_map = {}
+    _expanded = set()  # set of page names currently expanded
 
     # -- Load button + status row --
     load_btn = widgets.Button(
@@ -147,9 +156,17 @@ def report_explorer_tab(workspace_input=None, report_input=None):
         button_style="primary",
         layout=widgets.Layout(width="110px"),
     )
+    expand_btn = widgets.Button(
+        description="Expand All",
+        layout=widgets.Layout(width="100px"),
+    )
+    collapse_btn = widgets.Button(
+        description="Collapse All",
+        layout=widgets.Layout(width="100px"),
+    )
     conn_status = status_html()
     load_row = widgets.HBox(
-        [load_btn, conn_status],
+        [load_btn, expand_btn, collapse_btn, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
@@ -164,17 +181,29 @@ def report_explorer_tab(workspace_input=None, report_input=None):
         ),
     )
 
+    def _refresh_tree(preserve_selection=None):
+        nonlocal _key_map
+        options, _key_map = _build_tree(_report_data, _expanded)
+        tree.unobserve(on_select, names="value")
+        tree.options = options
+        if preserve_selection and preserve_selection in options:
+            tree.value = preserve_selection
+        else:
+            tree.value = None
+        tree.observe(on_select, names="value")
+
     # -- preview placeholder (top-right) --
     preview_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; '
         f'font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; '
         f'margin-bottom:2px;">Preview</div>'
     )
-    preview_placeholder = placeholder_panel("Preview — coming soon", min_height="250px")
-    preview_box = widgets.VBox(
-        [preview_label, preview_placeholder],
-        layout=widgets.Layout(flex="1"),
+    preview_placeholder = widgets.HTML(
+        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; '
+        f'font-family:{FONT_FAMILY}; text-align:center; '
+        f'font-style:italic;">Preview \u2014 coming soon</div>',
     )
+    preview_box = panel_box([preview_label, preview_placeholder], flex="1", min_height="250px")
 
     # -- properties placeholder (bottom-right) --
     props_label = widgets.HTML(
@@ -182,11 +211,12 @@ def report_explorer_tab(workspace_input=None, report_input=None):
         f'font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; '
         f'margin-bottom:2px;">Properties</div>'
     )
-    props_placeholder = placeholder_panel("Properties — coming soon", min_height="150px")
-    props_box = widgets.VBox(
-        [props_label, props_placeholder],
-        layout=widgets.Layout(flex="0 0 auto"),
+    props_placeholder = widgets.HTML(
+        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; '
+        f'font-family:{FONT_FAMILY}; text-align:center; '
+        f'font-style:italic;">Properties \u2014 coming soon</div>',
     )
+    props_box = panel_box([props_label, props_placeholder], flex="0 0 auto", min_height="150px")
 
     # -- three-panel layout --
     panels = create_three_panel_layout(tree, preview_box, props_box)
@@ -201,6 +231,7 @@ def report_explorer_tab(workspace_input=None, report_input=None):
     # -- handlers --
     def on_load(_):
         nonlocal _report_data, _key_map
+        _expanded.clear()
         ws = workspace_input.value.strip() if workspace_input else None
         ws = ws or None
         rpt = report_input.value.strip() if report_input else ""
@@ -214,9 +245,7 @@ def report_explorer_tab(workspace_input=None, report_input=None):
 
         try:
             _report_data = _load_report_data(report=rpt, workspace=ws)
-            options, _key_map = _build_tree(_report_data)
-            tree.options = options
-            tree.value = None
+            _refresh_tree()
 
             n_pages = len(_report_data["pages"])
             n_visuals = sum(len(p["visuals"]) for p in _report_data["pages"].values())
@@ -233,7 +262,33 @@ def report_explorer_tab(workspace_input=None, report_input=None):
             load_btn.disabled = False
             load_btn.description = "Load Report"
 
+    def on_select(change):
+        selected = change.get("new")
+        if not selected or selected not in _key_map:
+            return
+        key = _key_map[selected]
+        if key.startswith("page:"):
+            p_name = key.split(":", 1)[1]
+            if p_name in _expanded:
+                _expanded.discard(p_name)
+            else:
+                _expanded.add(p_name)
+            _refresh_tree(preserve_selection=selected)
+
+    def on_expand_all(_):
+        if _report_data:
+            _expanded.update(_report_data["pages"].keys())
+            _refresh_tree()
+
+    def on_collapse_all(_):
+        _expanded.clear()
+        if _report_data:
+            _refresh_tree()
+
     load_btn.on_click(on_load)
+    tree.observe(on_select, names="value")
+    expand_btn.on_click(on_expand_all)
+    collapse_btn.on_click(on_collapse_all)
 
     # -- assemble --
     return widgets.VBox(
