@@ -150,33 +150,6 @@ def _get_properties_html(report_data, key):
 
 def _get_embed_html(report_data, key):
     """Try to build an embed iframe for the selected page/visual."""
-    parts = key.split(":", 2)
-    node_type = parts[0]
-    report_id = report_data.get("report_id", "")
-    workspace_id = report_data.get("workspace_id", "")
-    if not report_id or not workspace_id:
-        return ""
-
-    base_url = f"https://app.powerbi.com/reportEmbed?reportId={report_id}&groupId={workspace_id}&autoAuth=true"
-
-    if node_type == "page":
-        p = report_data["pages"].get(parts[1], {})
-        page_display = p.get("display_name", parts[1])
-        url = f"{base_url}&pageName={parts[1]}"
-        return (
-            f'<iframe src="{url}" width="100%" height="350" '
-            f'frameborder="0" allowfullscreen="true" '
-            f'style="border:1px solid {BORDER_COLOR}; border-radius:6px;"></iframe>'
-        )
-
-    if node_type == "visual":
-        url = f"{base_url}&pageName={parts[1]}"
-        return (
-            f'<iframe src="{url}" width="100%" height="350" '
-            f'frameborder="0" allowfullscreen="true" '
-            f'style="border:1px solid {BORDER_COLOR}; border-radius:6px;"></iframe>'
-        )
-
     return ""
 
 
@@ -214,14 +187,13 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
         tree.value = preserve_selection if (preserve_selection and preserve_selection in options) else None
         tree.observe(on_select, names="value")
 
-    # -- preview (top-right, embed iframe or placeholder) --
+    # -- preview (top-right, powerbiclient Report widget) --
     preview_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Preview</div>'
     )
-    preview_html = widgets.HTML(
-        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY}; font-style:italic;">Select a page or visual to preview</div>',
-    )
-    preview_box = panel_box([preview_label, preview_html], flex="1", min_height="200px")
+    preview_output = widgets.Output(layout=widgets.Layout(width="100%", min_height="350px"))
+    _report_widget = [None]  # mutable container for powerbiclient Report
+    preview_box = panel_box([preview_label, preview_output], flex="1", min_height="380px")
 
     # -- properties (bottom-right) --
     props_label = widgets.HTML(
@@ -257,6 +229,21 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
             fmt = _report_data.get("format", "")
             fmt_str = f" ({fmt})" if fmt else ""
             set_status(conn_status, f"Loaded: {n_pages} pages, {n_visuals} visuals{fmt_str}", "#34c759")
+            # Initialize powerbiclient Report widget
+            report_id = _report_data.get("report_id", "")
+            workspace_id = _report_data.get("workspace_id", "")
+            if report_id and workspace_id:
+                try:
+                    from powerbiclient import Report as PBIReport
+                    _report_widget[0] = PBIReport(group_id=workspace_id, report_id=report_id)
+                    preview_output.clear_output(wait=True)
+                    with preview_output:
+                        from IPython.display import display
+                        display(_report_widget[0])
+                except Exception as embed_err:
+                    preview_output.clear_output(wait=True)
+                    with preview_output:
+                        print(f"Preview: {embed_err}")
         except Exception as e:
             set_status(conn_status, f"Error: {e}", "#ff3b30")
         finally:
@@ -277,16 +264,15 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
                 _expanded.add(p_name)
             _refresh_tree(preserve_selection=selected)
         props_html.value = _get_properties_html(_report_data, key)
-        # Try embed preview
-        embed = _get_embed_html(_report_data, key)
-        if embed:
-            preview_html.value = embed
-        else:
-            preview_html.value = (
-                f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; '
-                f'font-family:{FONT_FAMILY}; font-style:italic;">'
-                f'Embed preview not available (report ID not resolved)</div>'
-            )
+        # Page navigation via powerbiclient (if widget loaded)
+        if _report_widget[0] is not None and key.startswith("page:"):
+            p_name = key.split(":", 1)[1]
+            p = _report_data["pages"].get(p_name, {})
+            page_display = p.get("display_name", p_name)
+            try:
+                _report_widget[0].set_active_page(page_display)
+            except Exception:
+                pass
 
     def on_expand_all(_):
         if _report_data:
