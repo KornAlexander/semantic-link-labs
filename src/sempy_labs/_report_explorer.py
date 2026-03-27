@@ -24,15 +24,12 @@ def _load_report_data(report, workspace):
     """Load report structure via connect_report."""
     from sempy_labs.report import connect_report
 
-    report_data = {"pages": {}, "format": "", "report_id": "", "dataset_id": ""}
+    report_data = {"pages": {}, "format": "", "report_id": "", "workspace_id": ""}
 
     with connect_report(report=report, readonly=True, workspace=workspace) as rw:
         report_data["format"] = str(getattr(rw, "format", ""))
-        try:
-            report_data["report_id"] = str(getattr(rw, "report_id", "") or "")
-            report_data["dataset_id"] = str(getattr(rw, "dataset_id", "") or "")
-        except Exception:
-            pass
+        report_data["report_id"] = str(getattr(rw, "_report_id", "") or "")
+        report_data["workspace_id"] = str(getattr(rw, "_workspace_id", "") or "")
         pages_df = rw.list_pages()
         visuals_df = rw.list_visuals()
 
@@ -151,21 +148,16 @@ def _get_properties_html(report_data, key):
     return ""
 
 
-def _get_embed_html(report_data, key, workspace):
+def _get_embed_html(report_data, key):
     """Try to build an embed iframe for the selected page/visual."""
     parts = key.split(":", 2)
     node_type = parts[0]
     report_id = report_data.get("report_id", "")
-    if not report_id:
+    workspace_id = report_data.get("workspace_id", "")
+    if not report_id or not workspace_id:
         return ""
 
-    try:
-        import sempy.fabric as fabric
-        workspace_id = fabric.resolve_workspace_id(workspace) if workspace else fabric.resolve_workspace_id()
-    except Exception:
-        return ""
-
-    base_url = f"https://app.powerbi.com/reportEmbed?reportId={report_id}&groupId={workspace_id}&autoAuth=true&ctid="
+    base_url = f"https://app.powerbi.com/reportEmbed?reportId={report_id}&groupId={workspace_id}&autoAuth=true"
 
     if node_type == "page":
         p = report_data["pages"].get(parts[1], {})
@@ -286,8 +278,7 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
             _refresh_tree(preserve_selection=selected)
         props_html.value = _get_properties_html(_report_data, key)
         # Try embed preview
-        ws = workspace_input.value.strip() if workspace_input else None
-        embed = _get_embed_html(_report_data, key, ws)
+        embed = _get_embed_html(_report_data, key)
         if embed:
             preview_html.value = embed
         else:
