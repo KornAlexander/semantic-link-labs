@@ -302,6 +302,7 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
     _model_data = {}
     _key_map = {}
     _expanded = set()  # set of table names currently expanded
+    _current_key = [None]  # mutable container for currently selected node key
 
     # -- Load button + status row --
     load_btn = widgets.Button(
@@ -350,16 +351,27 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
         value="Select a measure to view its DAX expression.",
         layout=widgets.Layout(
             width="100%",
-            height="300px",
+            height="280px",
             font_family="monospace",
         ),
     )
+    save_btn = widgets.Button(
+        description="Save Expression",
+        button_style="warning",
+        disabled=True,
+        layout=widgets.Layout(width="140px"),
+    )
+    save_status = status_html()
     preview_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; '
         f'font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; '
         f'margin-bottom:2px;">Expression</div>'
     )
-    preview_box = panel_box([preview_label, preview], flex="1")
+    save_row = widgets.HBox(
+        [save_btn, save_status],
+        layout=widgets.Layout(align_items="center", gap="8px"),
+    )
+    preview_box = panel_box([preview_label, preview, save_row], flex="1")
 
     # -- properties (bottom-right, dynamic HTML) --
     props_label = widgets.HTML(
@@ -422,6 +434,7 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
         if not selected or selected not in _key_map:
             return
         key = _key_map[selected]
+        _current_key[0] = key
         # Toggle expand/collapse if a table row was clicked
         if key.startswith("table:"):
             t_name = key.split(":", 1)[1]
@@ -432,6 +445,9 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
             _refresh_tree(preserve_selection=selected)
         preview.value = _get_preview_text(_model_data, key)
         props_html.value = _get_properties_html(_model_data, key)
+        # Enable Save only for editable expression types
+        save_btn.disabled = key.split(":")[0] not in ("measure", "calc_item")
+        save_status.value = ""
 
     def on_expand_all(_):
         if _model_data:
@@ -443,10 +459,55 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
         if _model_data:
             _refresh_tree()
 
+    def on_save(_):
+        key = _current_key[0]
+        if not key:
+            return
+        parts = key.split(":", 2)
+        node_type = parts[0]
+        new_expr = preview.value
+
+        if node_type not in ("measure", "calc_item"):
+            set_status(save_status, "Only measures and calc items can be saved.", "#ff9500")
+            return
+
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        ds = report_input.value.strip() if report_input else ""
+        if not ds:
+            set_status(save_status, "No model loaded.", "#ff3b30")
+            return
+
+        save_btn.disabled = True
+        save_btn.description = "Saving…"
+        set_status(save_status, "Writing via XMLA…", GRAY_COLOR)
+
+        try:
+            from sempy_labs.tom import connect_semantic_model
+
+            with connect_semantic_model(dataset=ds, readonly=False, workspace=ws) as tm:
+                if node_type == "measure":
+                    t_name, m_name = parts[1], parts[2]
+                    tm.model.Tables[t_name].Measures[m_name].Expression = new_expr
+                    _model_data["tables"][t_name]["measures"][m_name]["expression"] = new_expr
+                elif node_type == "calc_item":
+                    t_name, ci_name = parts[1], parts[2]
+                    tm.model.Tables[t_name].CalculationGroup.CalculationItems[ci_name].Expression = new_expr
+                    _model_data["tables"][t_name]["calc_items"][ci_name]["expression"] = new_expr
+                tm.model.SaveChanges()
+
+            set_status(save_status, "\u2713 Saved successfully.", "#34c759")
+        except Exception as e:
+            set_status(save_status, f"Error: {e}", "#ff3b30")
+        finally:
+            save_btn.disabled = False
+            save_btn.description = "Save Expression"
+
     load_btn.on_click(on_load)
     tree.observe(on_select, names="value")
     expand_btn.on_click(on_expand_all)
     collapse_btn.on_click(on_collapse_all)
+    save_btn.on_click(on_save)
 
     # -- assemble --
     return widgets.VBox(
