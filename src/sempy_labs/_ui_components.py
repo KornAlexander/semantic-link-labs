@@ -59,9 +59,16 @@ def build_tree_items(items):
     """
     options = []
     key_map = {}
+    seen = {}  # track duplicate display strings
     for indent, icon_key, label, obj_key in items:
         icon = ICONS.get(icon_key, icon_key)
         formatted = f"{_INDENT * indent}{icon} {label}"
+        # Ensure uniqueness — append invisible counter for duplicates
+        if formatted in key_map:
+            count = seen.get(formatted, 1) + 1
+            seen[formatted] = count
+            # Use zero-width spaces to make string unique but visually identical
+            formatted = formatted + ("\u200b" * count)
         options.append(formatted)
         key_map[formatted] = obj_key
     return options, key_map
