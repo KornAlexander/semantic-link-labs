@@ -2,8 +2,6 @@
 # Provides a tree view of report pages and visuals.
 
 import ipywidgets as widgets
-from typing import Optional
-from uuid import UUID
 
 from sempy_labs._ui_components import (
     FONT_FAMILY,
@@ -13,8 +11,6 @@ from sempy_labs._ui_components import (
     ICONS,
     build_tree_items,
     create_three_panel_layout,
-    create_connection_bar,
-    input_label,
     status_html,
     set_status,
     placeholder_panel,
@@ -126,19 +122,16 @@ def _build_tree(report_data):
     return build_tree_items(items)
 
 
-def report_explorer_tab(
-    workspace: Optional[str | UUID] = None,
-    report: Optional[str | UUID] = None,
-):
+def report_explorer_tab(workspace_input=None, report_input=None):
     """
     Build the Report Explorer tab widget.
 
     Parameters
     ----------
-    workspace : str | uuid.UUID, default=None
-        Pre-populated workspace name or ID.
-    report : str | uuid.UUID, default=None
-        Pre-populated report name or ID.
+    workspace_input : widgets.Text
+        Shared workspace text input widget (reads .value on Load).
+    report_input : widgets.Text
+        Shared report text input widget (reads .value on Load).
 
     Returns
     -------
@@ -148,31 +141,16 @@ def report_explorer_tab(
     _report_data = {}
     _key_map = {}
 
-    # -- connection bar --
-    ws_input = widgets.Text(
-        value=str(workspace) if workspace else "",
-        placeholder="Leave empty for notebook workspace",
-        layout=widgets.Layout(width="220px"),
-    )
-    rpt_input = widgets.Text(
-        value=str(report) if report else "",
-        placeholder="Report name or ID",
-        layout=widgets.Layout(width="220px"),
-    )
+    # -- Load button + status row --
     load_btn = widgets.Button(
-        description="Load",
+        description="Load Report",
         button_style="primary",
-        layout=widgets.Layout(width="80px"),
+        layout=widgets.Layout(width="110px"),
     )
     conn_status = status_html()
-
-    conn_bar = create_connection_bar(
-        input_label("Workspace"),
-        ws_input,
-        input_label("Report"),
-        rpt_input,
-        load_btn,
-        conn_status,
+    load_row = widgets.HBox(
+        [load_btn, conn_status],
+        layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
     # -- tree --
@@ -223,10 +201,11 @@ def report_explorer_tab(
     # -- handlers --
     def on_load(_):
         nonlocal _report_data, _key_map
-        ws = ws_input.value.strip() or None
-        rpt = rpt_input.value.strip()
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        rpt = report_input.value.strip() if report_input else ""
         if not rpt:
-            set_status(conn_status, "Enter a report name or ID.", "#ff3b30")
+            set_status(conn_status, "Enter a report name in the top bar.", "#ff3b30")
             return
 
         load_btn.disabled = True
@@ -252,13 +231,13 @@ def report_explorer_tab(
             set_status(conn_status, f"Error: {e}", "#ff3b30")
         finally:
             load_btn.disabled = False
-            load_btn.description = "Load"
+            load_btn.description = "Load Report"
 
     load_btn.on_click(on_load)
 
     # -- assemble --
     return widgets.VBox(
-        [conn_bar, tree_header, panels],
+        [load_row, tree_header, panels],
         layout=widgets.Layout(
             padding="12px",
             gap="4px",

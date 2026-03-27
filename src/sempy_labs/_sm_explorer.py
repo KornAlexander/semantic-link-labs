@@ -3,8 +3,6 @@
 # calculation groups with DAX expression preview.
 
 import ipywidgets as widgets
-from typing import Optional
-from uuid import UUID
 
 from sempy_labs._ui_components import (
     FONT_FAMILY,
@@ -15,8 +13,6 @@ from sempy_labs._ui_components import (
     ICONS,
     build_tree_items,
     create_three_panel_layout,
-    create_connection_bar,
-    input_label,
     status_html,
     set_status,
     placeholder_panel,
@@ -235,19 +231,16 @@ def _get_preview_text(model_data, key):
     return ""
 
 
-def sm_explorer_tab(
-    workspace: Optional[str | UUID] = None,
-    dataset: Optional[str | UUID] = None,
-):
+def sm_explorer_tab(workspace_input=None, report_input=None):
     """
     Build the Semantic Model Explorer tab widget.
 
     Parameters
     ----------
-    workspace : str | uuid.UUID, default=None
-        Pre-populated workspace name or ID.
-    dataset : str | uuid.UUID, default=None
-        Pre-populated dataset / semantic model name or ID.
+    workspace_input : widgets.Text
+        Shared workspace text input widget (reads .value on Load).
+    report_input : widgets.Text
+        Shared report/model text input widget (reads .value on Load).
 
     Returns
     -------
@@ -257,31 +250,16 @@ def sm_explorer_tab(
     _model_data = {}
     _key_map = {}
 
-    # -- connection bar --
-    ws_input = widgets.Text(
-        value=str(workspace) if workspace else "",
-        placeholder="Leave empty for notebook workspace",
-        layout=widgets.Layout(width="220px"),
-    )
-    ds_input = widgets.Text(
-        value=str(dataset) if dataset else "",
-        placeholder="Semantic model name or ID",
-        layout=widgets.Layout(width="220px"),
-    )
+    # -- Load button + status row --
     load_btn = widgets.Button(
-        description="Load",
+        description="Load Model",
         button_style="primary",
-        layout=widgets.Layout(width="80px"),
+        layout=widgets.Layout(width="110px"),
     )
     conn_status = status_html()
-
-    conn_bar = create_connection_bar(
-        input_label("Workspace"),
-        ws_input,
-        input_label("Model"),
-        ds_input,
-        load_btn,
-        conn_status,
+    load_row = widgets.HBox(
+        [load_btn, conn_status],
+        layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
     # -- tree --
@@ -342,10 +320,11 @@ def sm_explorer_tab(
     # -- handlers --
     def on_load(_):
         nonlocal _model_data, _key_map
-        ws = ws_input.value.strip() or None
-        ds = ds_input.value.strip()
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        ds = report_input.value.strip() if report_input else ""
         if not ds:
-            set_status(conn_status, "Enter a semantic model name or ID.", "#ff3b30")
+            set_status(conn_status, "Enter a report / semantic model name in the top bar.", "#ff3b30")
             return
 
         load_btn.disabled = True
@@ -386,7 +365,7 @@ def sm_explorer_tab(
 
     # -- assemble --
     return widgets.VBox(
-        [conn_bar, tree_header, panels],
+        [load_row, tree_header, panels],
         layout=widgets.Layout(
             padding="12px",
             gap="4px",

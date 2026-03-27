@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 import ipywidgets as widgets
 import io
@@ -140,11 +140,11 @@ def pbi_fixer(
     subtitle = widgets.HTML(
         value=f'<div style="font-size:13px; color:{gray_color}; '
         f'font-family:-apple-system,BlinkMacSystemFont,sans-serif; margin-top:2px;">'
-        f'Select fixers to apply to your report and semantic model</div>'
+        f'Scan, fix, and explore your Power BI reports and semantic models</div>'
     )
     header = widgets.VBox(
         [title, subtitle],
-        layout=widgets.Layout(margin="0 0 16px 0"),
+        layout=widgets.Layout(margin="0 0 12px 0"),
     )
 
     # -----------------------------
@@ -174,7 +174,7 @@ def pbi_fixer(
     )
 
     # -----------------------------
-    # REPORT INPUTS
+    # SHARED INPUTS (top-level, used by all tabs)
     # -----------------------------
     def _input_label(text):
         return widgets.HTML(
@@ -183,9 +183,14 @@ def pbi_fixer(
             f'min-width:90px; display:inline-block;">{text}</span>'
         )
 
+    workspace_input = widgets.Text(
+        value=str(workspace) if workspace else "",
+        placeholder="Leave empty for notebook workspace",
+        layout=widgets.Layout(width="300px"),
+    )
     report_input = widgets.Text(
         value=str(report) if report else "",
-        placeholder="Report name or ID",
+        placeholder="Report / semantic model name or ID",
         layout=widgets.Layout(width="300px"),
     )
     page_input = widgets.Text(
@@ -193,13 +198,8 @@ def pbi_fixer(
         placeholder="Leave empty for all pages",
         layout=widgets.Layout(width="300px"),
     )
-    workspace_input = widgets.Text(
-        value=str(workspace) if workspace else "",
-        placeholder="Leave empty for notebook workspace",
-        layout=widgets.Layout(width="300px"),
-    )
 
-    inputs_box = widgets.VBox(
+    shared_inputs_box = widgets.VBox(
         [
             widgets.HBox(
                 [_input_label("Workspace"), workspace_input],
@@ -209,19 +209,31 @@ def pbi_fixer(
                 [_input_label("Report"), report_input],
                 layout=widgets.Layout(align_items="center", gap="8px"),
             ),
-            widgets.HBox(
-                [_input_label("Page (opt.)"), page_input],
-                layout=widgets.Layout(align_items="center", gap="8px"),
-            ),
         ],
         layout=widgets.Layout(
             gap="8px",
             padding="12px",
-            margin="0 0 16px 0",
+            margin="0 0 12px 0",
             border=f"1px solid {border_color}",
             border_radius="8px",
         ),
     )
+
+    # -----------------------------
+    # TAB SELECTOR (ToggleButtons — more reliable than widgets.Tab in Fabric)
+    # -----------------------------
+    _tab_options = ["\u26A1 Fixer"]
+    if sm_explorer_tab is not None:
+        _tab_options.append("\U0001F4CA Semantic Model")
+    if report_explorer_tab is not None:
+        _tab_options.append("\U0001F4C4 Report")
+
+    tab_selector = widgets.ToggleButtons(
+        options=_tab_options,
+        value=_tab_options[0],
+        layout=widgets.Layout(margin="0 0 12px 0"),
+    )
+    tab_selector.style.button_width = "160px"
 
     # -----------------------------
     # SECTION HEADING HELPER
@@ -586,41 +598,49 @@ def pbi_fixer(
         f'margin-top:8px;">Version: {__version__}</div>'
     )
 
-    # -- Fixer tab content (existing UI) --
+    # -- Fixer tab content (existing UI, minus inputs which are now shared) --
+    page_input_row = widgets.HBox(
+        [_input_label("Page (opt.)"), page_input],
+        layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 12px 0"),
+    )
     fixer_content = widgets.VBox(
         [
-            header,
             mode_row,
-            inputs_box,
+            page_input_row,
             report_fixers_box,
             semantic_model_box,
             button_row,
             progress,
             status,
         ],
-        layout=widgets.Layout(padding="8px"),
+        layout=widgets.Layout(padding="4px 0"),
     )
 
-    # -- Build Tab widget --
-    tab_children = [fixer_content]
-    tab_titles = ["\u26A1 Fixer"]
+    # -- Build tab panels (show/hide via layout.display) --
+    tab_panels = [fixer_content]
 
     if sm_explorer_tab is not None:
-        sm_tab = sm_explorer_tab(workspace=workspace, dataset=report)
-        tab_children.append(sm_tab)
-        tab_titles.append("\U0001F4CA Semantic Model")
+        sm_content = sm_explorer_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(sm_content)
 
     if report_explorer_tab is not None:
-        rpt_tab = report_explorer_tab(workspace=workspace, report=report)
-        tab_children.append(rpt_tab)
-        tab_titles.append("\U0001F4C4 Report")
+        rpt_content = report_explorer_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(rpt_content)
 
-    tab = widgets.Tab(children=tab_children)
-    for i, title in enumerate(tab_titles):
-        tab.set_title(i, title)
+    def _switch_tab(change=None):
+        idx = _tab_options.index(tab_selector.value)
+        for i, panel in enumerate(tab_panels):
+            panel.layout.display = "" if i == idx else "none"
+
+    tab_selector.observe(_switch_tab, names="value")
+    _switch_tab()  # set initial visibility
 
     container = widgets.VBox(
-        [tab, version_footer],
+        [header, shared_inputs_box, tab_selector] + tab_panels + [version_footer],
         layout=widgets.Layout(
             width="900px",
             padding="20px",
