@@ -162,71 +162,114 @@ def _build_tree(model_data):
 
 
 def _get_preview_text(model_data, key):
-    """Return preview text for a selected tree node."""
+    """Return DAX/expression preview text for a selected tree node."""
+    parts = key.split(":", 2)
+    node_type = parts[0]
+
+    if node_type == "measure":
+        t_name, m_name = parts[1], parts[2]
+        m = model_data["tables"][t_name]["measures"].get(m_name, {})
+        return m.get("expression", "")
+
+    if node_type == "column":
+        t_name, c_name = parts[1], parts[2]
+        c = model_data["tables"][t_name]["columns"].get(c_name, {})
+        if c.get("expression"):
+            return c["expression"]
+        return ""
+
+    if node_type == "calc_item":
+        t_name, ci_name = parts[1], parts[2]
+        ci = model_data["tables"][t_name]["calc_items"].get(ci_name, {})
+        return ci.get("expression", "")
+
+    return ""
+
+
+def _prop_row(label, value):
+    """Single property row as HTML table row."""
+    return (
+        f'<tr><td style="padding:3px 10px 3px 0; font-weight:600; color:#555; '
+        f'white-space:nowrap; vertical-align:top;">{label}</td>'
+        f'<td style="padding:3px 0; word-break:break-word;">{value}</td></tr>'
+    )
+
+
+def _props_table(rows_html):
+    """Wrap property rows in a styled HTML table."""
+    return (
+        f'<table style="font-size:13px; font-family:{FONT_FAMILY}; '
+        f'border-collapse:collapse; width:100%;">'
+        f'{rows_html}</table>'
+    )
+
+
+def _get_properties_html(model_data, key):
+    """Return properties HTML for the bottom-right panel."""
     parts = key.split(":", 2)
     node_type = parts[0]
 
     if node_type == "table":
         t_name = parts[1]
         t = model_data["tables"].get(t_name, {})
-        lines = [f"Table: {t_name}"]
-        lines.append(f"Type: {t.get('type', '')}")
+        rows = _prop_row("Name", t_name)
+        rows += _prop_row("Type", t.get("type", ""))
+        rows += _prop_row("Hidden", str(t.get("is_hidden", False)))
         if t.get("description"):
-            lines.append(f"Description: {t['description']}")
-        lines.append(f"Columns: {len(t.get('columns', {}))}")
-        lines.append(f"Measures: {len(t.get('measures', {}))}")
-        lines.append(f"Hierarchies: {len(t.get('hierarchies', {}))}")
+            rows += _prop_row("Description", t["description"])
+        rows += _prop_row("Columns", str(len(t.get("columns", {}))))
+        rows += _prop_row("Measures", str(len(t.get("measures", {}))))
+        rows += _prop_row("Hierarchies", str(len(t.get("hierarchies", {}))))
         if t.get("calc_items"):
-            lines.append(f"Calculation Items: {len(t['calc_items'])}")
-        return "\n".join(lines)
+            rows += _prop_row("Calc Items", str(len(t["calc_items"])))
+        return _props_table(rows)
 
     if node_type == "measure":
         t_name, m_name = parts[1], parts[2]
         m = model_data["tables"][t_name]["measures"].get(m_name, {})
-        lines = [f"// Measure: {m_name}"]
-        lines.append(f"// Table: {t_name}")
-        if m.get("description"):
-            lines.append(f"// {m['description']}")
+        rows = _prop_row("Name", m_name)
+        rows += _prop_row("Table", t_name)
+        rows += _prop_row("Object Type", "Measure")
         if m.get("format_string"):
-            lines.append(f"// Format: {m['format_string']}")
+            rows += _prop_row("Format String", m["format_string"])
         if m.get("display_folder"):
-            lines.append(f"// Folder: {m['display_folder']}")
-        lines.append("")
-        lines.append(m.get("expression", ""))
-        return "\n".join(lines)
+            rows += _prop_row("Display Folder", m["display_folder"])
+        if m.get("description"):
+            rows += _prop_row("Description", m["description"])
+        return _props_table(rows)
 
     if node_type == "column":
         t_name, c_name = parts[1], parts[2]
         c = model_data["tables"][t_name]["columns"].get(c_name, {})
-        lines = [f"Column: {c_name}"]
-        lines.append(f"Table: {t_name}")
-        lines.append(f"Data Type: {c.get('data_type', '')}")
-        lines.append(f"Column Type: {c.get('type', '')}")
-        lines.append(f"Hidden: {c.get('is_hidden', False)}")
+        rows = _prop_row("Name", c_name)
+        rows += _prop_row("Table", t_name)
+        rows += _prop_row("Data Type", c.get("data_type", ""))
+        rows += _prop_row("Column Type", c.get("type", ""))
+        rows += _prop_row("Hidden", str(c.get("is_hidden", False)))
         if c.get("expression"):
-            lines.append(f"\n// Calculated column expression:")
-            lines.append(c["expression"])
-        return "\n".join(lines)
+            rows += _prop_row("Calculated", "Yes")
+        return _props_table(rows)
 
     if node_type == "hierarchy":
         t_name, h_name = parts[1], parts[2]
         h = model_data["tables"][t_name]["hierarchies"].get(h_name, {})
-        lines = [f"Hierarchy: {h_name}"]
-        lines.append(f"Table: {t_name}")
-        lines.append(f"Levels ({len(h.get('levels', []))}):")
-        for i, lvl in enumerate(h.get("levels", []), 1):
-            lines.append(f"  {i}. {lvl}")
-        return "\n".join(lines)
+        rows = _prop_row("Name", h_name)
+        rows += _prop_row("Table", t_name)
+        rows += _prop_row("Object Type", "Hierarchy")
+        levels = h.get("levels", [])
+        rows += _prop_row("Levels", str(len(levels)))
+        for i, lvl in enumerate(levels, 1):
+            rows += _prop_row(f"  Level {i}", lvl)
+        return _props_table(rows)
 
     if node_type == "calc_item":
         t_name, ci_name = parts[1], parts[2]
         ci = model_data["tables"][t_name]["calc_items"].get(ci_name, {})
-        lines = [f"// Calculation Item: {ci_name}"]
-        lines.append(f"// Calculation Group: {t_name}")
-        lines.append(f"// Ordinal: {ci.get('ordinal', 0)}")
-        lines.append("")
-        lines.append(ci.get("expression", ""))
-        return "\n".join(lines)
+        rows = _prop_row("Name", ci_name)
+        rows += _prop_row("Calc Group", t_name)
+        rows += _prop_row("Object Type", "Calculation Item")
+        rows += _prop_row("Ordinal", str(ci.get("ordinal", 0)))
+        return _props_table(rows)
 
     return ""
 
@@ -295,16 +338,26 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
         layout=widgets.Layout(flex="1"),
     )
 
-    # -- properties placeholder (bottom-right) --
+    # -- properties (bottom-right, dynamic HTML) --
     props_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; '
         f'font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; '
         f'margin-bottom:2px;">Properties</div>'
     )
-    props_placeholder = placeholder_panel("Properties — coming soon", min_height="150px")
+    props_html = widgets.HTML(
+        value=f'<div style="padding:12px; color:{GRAY_COLOR}; font-size:13px; '
+        f'font-family:{FONT_FAMILY}; font-style:italic;">Select an object to view properties</div>',
+    )
     props_box = widgets.VBox(
-        [props_label, props_placeholder],
-        layout=widgets.Layout(flex="0 0 auto"),
+        [props_label, props_html],
+        layout=widgets.Layout(
+            flex="0 0 auto",
+            border=f"1px solid {BORDER_COLOR}",
+            border_radius="8px",
+            padding="8px",
+            min_height="150px",
+            background_color=SECTION_BG,
+        ),
     )
 
     # -- three-panel layout --
@@ -357,8 +410,8 @@ def sm_explorer_tab(workspace_input=None, report_input=None):
         if not selected or selected not in _key_map:
             return
         key = _key_map[selected]
-        text = _get_preview_text(_model_data, key)
-        preview.value = text
+        preview.value = _get_preview_text(_model_data, key)
+        props_html.value = _get_properties_html(_model_data, key)
 
     load_btn.on_click(on_load)
     tree.observe(on_select, names="value")
