@@ -1,5 +1,6 @@
 # Report Explorer tab for PBI Fixer.
-# Provides a tree view of report pages and visuals with preview and properties.
+# Provides a tree view of report pages and visuals with iframe preview,
+# properties, and fixer action dropdown.
 
 import ipywidgets as widgets
 
@@ -23,10 +24,15 @@ def _load_report_data(report, workspace):
     """Load report structure via connect_report."""
     from sempy_labs.report import connect_report
 
-    report_data = {"pages": {}, "format": ""}
+    report_data = {"pages": {}, "format": "", "report_id": "", "dataset_id": ""}
 
     with connect_report(report=report, readonly=True, workspace=workspace) as rw:
         report_data["format"] = str(getattr(rw, "format", ""))
+        try:
+            report_data["report_id"] = str(getattr(rw, "report_id", "") or "")
+            report_data["dataset_id"] = str(getattr(rw, "dataset_id", "") or "")
+        except Exception:
+            pass
         pages_df = rw.list_pages()
         visuals_df = rw.list_visuals()
 
@@ -104,45 +110,8 @@ def _props_table(rows_html):
     )
 
 
-def _get_preview_html(report_data, key):
-    """Return preview HTML for pages and visuals."""
-    parts = key.split(":", 2)
-    node_type = parts[0]
-
-    if node_type == "page":
-        p = report_data["pages"].get(parts[1], {})
-        rows = _prop_row("Page", p.get("display_name", parts[1]))
-        rows += _prop_row("Size", f"{p.get('width', 0)} \u00d7 {p.get('height', 0)}")
-        rows += _prop_row("Hidden", str(p.get("hidden", False)))
-        rows += _prop_row("Visuals", str(len(p.get("visuals", {}))))
-        # Visual type summary
-        type_counts = {}
-        for v in p.get("visuals", {}).values():
-            dt = v.get("display_type") or v.get("type", "unknown")
-            type_counts[dt] = type_counts.get(dt, 0) + 1
-        if type_counts:
-            summary = ", ".join(f"{count}\u00d7 {t}" for t, count in sorted(type_counts.items(), key=lambda x: -x[1]))
-            rows += _prop_row("Visual Types", summary)
-        return _props_table(rows)
-
-    if node_type == "visual":
-        p_name, v_name = parts[1], parts[2] if len(parts) > 2 else ""
-        v = report_data["pages"].get(p_name, {}).get("visuals", {}).get(v_name, {})
-        rows = _prop_row("Visual", v.get("display_type") or v.get("type", ""))
-        if v.get("title"):
-            rows += _prop_row("Title", v["title"])
-        rows += _prop_row("Page", report_data["pages"].get(p_name, {}).get("display_name", p_name))
-        rows += _prop_row("Position", f"x={v.get('x', 0)}, y={v.get('y', 0)}")
-        rows += _prop_row("Size", f"{v.get('width', 0)} \u00d7 {v.get('height', 0)}")
-        rows += _prop_row("Hidden", str(v.get("hidden", False)))
-        rows += _prop_row("Internal Name", v_name)
-        return _props_table(rows)
-
-    return ""
-
-
 def _get_properties_html(report_data, key):
-    """Return properties HTML for the bottom-right panel."""
+    """Return combined properties HTML (stats + metadata)."""
     parts = key.split(":", 2)
     node_type = parts[0]
 
@@ -152,8 +121,16 @@ def _get_properties_html(report_data, key):
         rows += _prop_row("Internal Name", parts[1])
         rows += _prop_row("Width", str(p.get("width", 0)))
         rows += _prop_row("Height", str(p.get("height", 0)))
+        rows += _prop_row("Size", f"{p.get('width', 0)} \u00d7 {p.get('height', 0)}")
         rows += _prop_row("Hidden", str(p.get("hidden", False)))
         rows += _prop_row("Visual Count", str(len(p.get("visuals", {}))))
+        type_counts = {}
+        for v in p.get("visuals", {}).values():
+            dt = v.get("display_type") or v.get("type", "unknown")
+            type_counts[dt] = type_counts.get(dt, 0) + 1
+        if type_counts:
+            summary = ", ".join(f"{count}\u00d7 {t}" for t, count in sorted(type_counts.items(), key=lambda x: -x[1]))
+            rows += _prop_row("Visual Types", summary)
         return _props_table(rows)
 
     if node_type == "visual":
@@ -165,26 +142,54 @@ def _get_properties_html(report_data, key):
         if v.get("title"):
             rows += _prop_row("Title", v["title"])
         rows += _prop_row("Internal Name", v_name)
-        rows += _prop_row("X", str(v.get("x", 0)))
-        rows += _prop_row("Y", str(v.get("y", 0)))
-        rows += _prop_row("Width", str(v.get("width", 0)))
-        rows += _prop_row("Height", str(v.get("height", 0)))
-        rows += _prop_row("Hidden", str(v.get("hidden", False)))
         rows += _prop_row("Page", report_data["pages"].get(p_name, {}).get("display_name", p_name))
+        rows += _prop_row("Position", f"x={v.get('x', 0)}, y={v.get('y', 0)}")
+        rows += _prop_row("Size", f"{v.get('width', 0)} \u00d7 {v.get('height', 0)}")
+        rows += _prop_row("Hidden", str(v.get("hidden", False)))
         return _props_table(rows)
 
     return ""
 
 
-def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=None):
-    """
-    Build the Report Explorer tab widget.
+def _get_embed_html(report_data, key, workspace):
+    """Try to build an embed iframe for the selected page/visual."""
+    parts = key.split(":", 2)
+    node_type = parts[0]
+    report_id = report_data.get("report_id", "")
+    if not report_id:
+        return ""
 
-    Parameters
-    ----------
-    fixer_callbacks : dict, optional
-        Mapping of fixer label -> callable(report, page, workspace, scan_only).
-    """
+    try:
+        import sempy.fabric as fabric
+        workspace_id = fabric.resolve_workspace_id(workspace) if workspace else fabric.resolve_workspace_id()
+    except Exception:
+        return ""
+
+    base_url = f"https://app.powerbi.com/reportEmbed?reportId={report_id}&groupId={workspace_id}&autoAuth=true&ctid="
+
+    if node_type == "page":
+        p = report_data["pages"].get(parts[1], {})
+        page_display = p.get("display_name", parts[1])
+        url = f"{base_url}&pageName={parts[1]}"
+        return (
+            f'<iframe src="{url}" width="100%" height="350" '
+            f'frameborder="0" allowfullscreen="true" '
+            f'style="border:1px solid {BORDER_COLOR}; border-radius:6px;"></iframe>'
+        )
+
+    if node_type == "visual":
+        url = f"{base_url}&pageName={parts[1]}"
+        return (
+            f'<iframe src="{url}" width="100%" height="350" '
+            f'frameborder="0" allowfullscreen="true" '
+            f'style="border:1px solid {BORDER_COLOR}; border-radius:6px;"></iframe>'
+        )
+
+    return ""
+
+
+def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=None):
+    """Build the Report Explorer tab widget."""
     _report_data = {}
     _key_map = {}
     _expanded = set()
@@ -194,14 +199,12 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
     expand_btn = widgets.Button(description="Expand All", layout=widgets.Layout(width="100px"))
     collapse_btn = widgets.Button(description="Collapse All", layout=widgets.Layout(width="100px"))
 
-    # Fixer action dropdown
     fixer_callbacks = fixer_callbacks or {}
     fixer_dropdown = widgets.Dropdown(
         options=["Actions..."] + list(fixer_callbacks.keys()),
         value="Actions...",
         layout=widgets.Layout(width="200px"),
     )
-    fixer_dropdown.layout.display = "" if fixer_callbacks else "none"
 
     conn_status = status_html()
     load_row = widgets.HBox(
@@ -219,12 +222,12 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
         tree.value = preserve_selection if (preserve_selection and preserve_selection in options) else None
         tree.observe(on_select, names="value")
 
-    # -- preview (top-right) --
+    # -- preview (top-right, embed iframe or placeholder) --
     preview_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Preview</div>'
     )
     preview_html = widgets.HTML(
-        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY}; font-style:italic;">Select a page or visual to see details</div>',
+        value=f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY}; font-style:italic;">Select a page or visual to preview</div>',
     )
     preview_box = panel_box([preview_label, preview_html], flex="1", min_height="200px")
 
@@ -281,8 +284,18 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
             else:
                 _expanded.add(p_name)
             _refresh_tree(preserve_selection=selected)
-        preview_html.value = _get_preview_html(_report_data, key)
         props_html.value = _get_properties_html(_report_data, key)
+        # Try embed preview
+        ws = workspace_input.value.strip() if workspace_input else None
+        embed = _get_embed_html(_report_data, key, ws)
+        if embed:
+            preview_html.value = embed
+        else:
+            preview_html.value = (
+                f'<div style="padding:16px; color:{GRAY_COLOR}; font-size:13px; '
+                f'font-family:{FONT_FAMILY}; font-style:italic;">'
+                f'Embed preview not available (report ID not resolved)</div>'
+            )
 
     def on_expand_all(_):
         if _report_data:

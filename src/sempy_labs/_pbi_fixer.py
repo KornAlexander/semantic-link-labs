@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.2"
+__version__ = "1.2.3"
 
 import ipywidgets as widgets
 import io
@@ -77,6 +77,11 @@ try:
     from sempy_labs._report_explorer import report_explorer_tab
 except ImportError:
     report_explorer_tab = None
+
+try:
+    from sempy_labs._perspective_editor import perspective_editor_tab
+except ImportError:
+    perspective_editor_tab = None
 
 
 def pbi_fixer(
@@ -227,6 +232,8 @@ def pbi_fixer(
         _tab_options.append("\U0001F4CA Semantic Model")
     if report_explorer_tab is not None:
         _tab_options.append("\U0001F4C4 Report")
+    if perspective_editor_tab is not None:
+        _tab_options.append("\U0001F50D Perspectives")
 
     tab_selector = widgets.ToggleButtons(
         options=_tab_options,
@@ -644,6 +651,12 @@ def pbi_fixer(
             fixer_callbacks=_fixer_cbs,
         )
         tab_panels.append(rpt_content)
+
+    if perspective_editor_tab is not None:
+        persp_content = perspective_editor_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(persp_content)
 
     def _switch_tab(change=None):
         idx = _tab_options.index(tab_selector.value)
