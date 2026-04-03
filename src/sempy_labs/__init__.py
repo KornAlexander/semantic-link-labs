@@ -1,4 +1,3 @@
-from ._pbi_fixer import pbi_fixer
 from ._labels import (
     list_item_labels,
 )
