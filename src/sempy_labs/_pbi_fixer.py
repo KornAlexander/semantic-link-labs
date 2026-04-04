@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.133"
+__version__ = "1.2.134"
 
 import ipywidgets as widgets
 import io
@@ -1354,10 +1354,11 @@ def _prototype_tab(workspace_input=None, report_input=None):
             total = len(pages_data)
             export_errors = []
             if screenshots_cb.value:
-                for idx, pg in enumerate(pages_data):
-                    if pg["hidden"]:
-                        continue
-                    set_status(conn_status, f"Exporting page {idx+1}/{total}: '{pg['display_name']}'\u2026", GRAY_COLOR)
+                import threading
+                visible_pages = [(idx, pg) for idx, pg in enumerate(pages_data) if not pg["hidden"]]
+                set_status(conn_status, f"Exporting {len(visible_pages)} pages in parallel\u2026", GRAY_COLOR)
+
+                def _export_one(idx, pg):
                     try:
                         import io as _io
                         from contextlib import redirect_stdout as _redirect
@@ -1378,7 +1379,6 @@ def _prototype_tab(workspace_input=None, report_input=None):
                         finally:
                             _ipd.display = _orig
 
-                        # Read back from lakehouse
                         from sempy_labs._helper_functions import _mount
                         local_path = _mount()
                         png_path = f"{local_path}/Files/_prototype_{idx:02d}.png"
@@ -1387,11 +1387,19 @@ def _prototype_tab(workspace_input=None, report_input=None):
                             with open(png_path, "rb") as f:
                                 png_bytes = f.read()
                             _page_images[pg["name"]] = base64.b64encode(png_bytes).decode("ascii")
-                            os.remove(png_path)  # cleanup
+                            os.remove(png_path)
                         else:
                             export_errors.append(f"'{pg['display_name']}': file not found")
                     except Exception as e:
                         export_errors.append(f"'{pg['display_name']}': {str(e)[:500]}")
+
+                threads = []
+                for idx, pg in visible_pages:
+                    t = threading.Thread(target=_export_one, args=(idx, pg))
+                    t.start()
+                    threads.append(t)
+                for t in threads:
+                    t.join()
 
             # Build SVG
             set_status(conn_status, "Building diagram\u2026", GRAY_COLOR)
