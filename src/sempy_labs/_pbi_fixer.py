@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.130"
+__version__ = "1.2.131"
 
 import ipywidgets as widgets
 import io
@@ -1369,7 +1369,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
                                 export_report(
                                     report=rpt,
                                     export_format="PNG",
-                                    file_name=f"_prototype_{idx:02d}.png",
+                                    file_name=f"_prototype_{idx:02d}",
                                     page_name=pg["name"],
                                     workspace=ws,
                                 )
