@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.141"
+__version__ = "1.2.142"
 
 import ipywidgets as widgets
 import io
@@ -2474,6 +2474,35 @@ def pbi_fixer(
         print(f"\u2713 All DAX expressions formatted.")
 
     _model_fixer_cbs["Format All DAX"] = lambda **kw: _format_all_dax(**kw)
+
+    # Incremental Refresh setup
+    _setup_ir = _lazy_import("sempy_labs.semantic_model._Setup_IncrementalRefresh", "setup_incremental_refresh")
+    if _setup_ir is not None:
+        def _run_ir(**kw):
+            ds = kw.get("report", "")
+            ws = kw.get("workspace")
+            scan = kw.get("scan_only", False)
+            # Get selected table from the current tree selection
+            # If no table selected, print instructions
+            print(f"Setting up incremental refresh for all tables in '{ds}'\u2026")
+            from sempy_labs.tom import connect_semantic_model
+            import Microsoft.AnalysisServices.Tabular as TOM
+            with connect_semantic_model(dataset=ds, readonly=True, workspace=ws) as tom:
+                for table in tom.model.Tables:
+                    # Skip calculated tables and tables with existing refresh policy
+                    try:
+                        if table.CalculationGroup is not None:
+                            continue
+                    except Exception:
+                        pass
+                    if table.EnableRefreshPolicy:
+                        print(f"  '{table.Name}': already has refresh policy, skipping.")
+                        continue
+                    has_date = any(col.DataType == TOM.DataType.DateTime for col in table.Columns)
+                    if not has_date:
+                        continue
+                    _setup_ir(dataset=ds, table_name=table.Name, workspace=ws, scan_only=scan)
+        _model_fixer_cbs["Setup Incremental Refresh"] = lambda **kw: _run_ir(**kw)
 
     # BPA standalone fixers — also available as Model Explorer actions
     _bpa_fix_floating = _lazy_import("sempy_labs.semantic_model._Fix_FloatingPointDataType", "fix_floating_point_datatype")
