@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.127"
+__version__ = "1.2.128"
 
 import ipywidgets as widgets
 import io
@@ -1270,12 +1270,13 @@ def _prototype_tab(workspace_input=None, report_input=None):
     )
 
     generate_btn = widgets.Button(description="\U0001F4D0 Generate Prototype", button_style="primary", layout=widgets.Layout(width="200px"))
+    screenshots_cb = widgets.Checkbox(value=False, description="Export screenshots (requires Export API)", indent=False, layout=widgets.Layout(width="auto"))
     export_excalidraw_btn = widgets.Button(description="\u2B07 Save .excalidraw", layout=widgets.Layout(width="150px", display="none"))
     export_svg_btn = widgets.Button(description="\u2B07 Save .svg", layout=widgets.Layout(width="120px", display="none"))
     conn_status = status_html()
 
     nav_row = widgets.HBox(
-        [generate_btn, export_excalidraw_btn, export_svg_btn, conn_status],
+        [generate_btn, screenshots_cb, export_excalidraw_btn, export_svg_btn, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
@@ -1347,47 +1348,48 @@ def _prototype_tab(workspace_input=None, report_input=None):
                 generate_btn.description = "\U0001F4D0 Generate Prototype"
                 return
 
-            # Try to export each page as PNG
+            # Try to export each page as PNG (only if checkbox checked)
             total = len(pages_data)
             export_errors = []
-            for idx, pg in enumerate(pages_data):
-                if pg["hidden"]:
-                    continue
-                set_status(conn_status, f"Exporting page {idx+1}/{total}: '{pg['display_name']}'\u2026", GRAY_COLOR)
-                try:
-                    import io as _io
-                    from contextlib import redirect_stdout as _redirect
-                    import IPython.display as _ipd
-                    _orig = _ipd.display
-                    _ipd.display = lambda *a, **kw: None
-                    buf = _io.StringIO()
+            if screenshots_cb.value:
+                for idx, pg in enumerate(pages_data):
+                    if pg["hidden"]:
+                        continue
+                    set_status(conn_status, f"Exporting page {idx+1}/{total}: '{pg['display_name']}'\u2026", GRAY_COLOR)
                     try:
-                        with _redirect(buf):
-                            from sempy_labs.report import export_report
-                            export_report(
-                                report=rpt,
-                                export_format="PNG",
-                                file_name=f"_prototype_{idx:02d}.png",
-                                page_name=pg["name"],
-                                workspace=ws,
-                            )
-                    finally:
-                        _ipd.display = _orig
+                        import io as _io
+                        from contextlib import redirect_stdout as _redirect
+                        import IPython.display as _ipd
+                        _orig = _ipd.display
+                        _ipd.display = lambda *a, **kw: None
+                        buf = _io.StringIO()
+                        try:
+                            with _redirect(buf):
+                                from sempy_labs.report import export_report
+                                export_report(
+                                    report=rpt,
+                                    export_format="PNG",
+                                    file_name=f"_prototype_{idx:02d}.png",
+                                    page_name=pg["name"],
+                                    workspace=ws,
+                                )
+                        finally:
+                            _ipd.display = _orig
 
-                    # Read back from lakehouse
-                    from sempy_labs._helper_functions import _mount
-                    local_path = _mount()
-                    png_path = f"{local_path}/Files/_prototype_{idx:02d}.png"
-                    import os
-                    if os.path.exists(png_path):
-                        with open(png_path, "rb") as f:
-                            png_bytes = f.read()
-                        _page_images[pg["name"]] = base64.b64encode(png_bytes).decode("ascii")
-                        os.remove(png_path)  # cleanup
-                    else:
-                        export_errors.append(f"'{pg['display_name']}': file not found at {png_path}")
-                except Exception as e:
-                    export_errors.append(f"'{pg['display_name']}': {str(e)[:80]}")
+                        # Read back from lakehouse
+                        from sempy_labs._helper_functions import _mount
+                        local_path = _mount()
+                        png_path = f"{local_path}/Files/_prototype_{idx:02d}.png"
+                        import os
+                        if os.path.exists(png_path):
+                            with open(png_path, "rb") as f:
+                                png_bytes = f.read()
+                            _page_images[pg["name"]] = base64.b64encode(png_bytes).decode("ascii")
+                            os.remove(png_path)  # cleanup
+                        else:
+                            export_errors.append(f"'{pg['display_name']}': file not found")
+                    except Exception as e:
+                        export_errors.append(f"'{pg['display_name']}': {str(e)[:80]}")
 
             # Build SVG
             set_status(conn_status, "Building diagram\u2026", GRAY_COLOR)
