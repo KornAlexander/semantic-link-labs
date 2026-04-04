@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.132"
+__version__ = "1.2.133"
 
 import ipywidgets as widgets
 import io
@@ -1294,6 +1294,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
     _svg_cache = [None]
     _excalidraw_cache = [None]
     _page_images = {}  # page_name -> base64 png
+    _rpt_name = [None]  # cached report name for export filenames
 
     # Layout constants
     _THUMB_W = 480
@@ -1320,6 +1321,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
         generate_btn.disabled = True
         generate_btn.description = "Generating\u2026"
         _page_images.clear()
+        _rpt_name[0] = rpt
 
         try:
             import base64
@@ -1534,10 +1536,12 @@ def _prototype_tab(workspace_input=None, report_input=None):
         try:
             from sempy_labs._helper_functions import _mount
             local_path = _mount()
-            path = f"{local_path}/Files/report_prototype.excalidraw"
+            safe_name = (_rpt_name[0] or "report").replace(" ", "_").replace("/", "_")
+            fname = f"{safe_name}_prototype.excalidraw"
+            path = f"{local_path}/Files/{fname}"
             with open(path, "w", encoding="utf-8") as f:
                 f.write(_excalidraw_cache[0])
-            set_status(conn_status, "\u2713 Saved report_prototype.excalidraw to lakehouse Files.", "#34c759")
+            set_status(conn_status, f"\u2713 Saved {fname} to lakehouse Files.", "#34c759")
         except Exception as e:
             set_status(conn_status, f"Error saving: {e}", "#ff3b30")
 
@@ -1547,10 +1551,12 @@ def _prototype_tab(workspace_input=None, report_input=None):
         try:
             from sempy_labs._helper_functions import _mount
             local_path = _mount()
-            path = f"{local_path}/Files/report_prototype.svg"
+            safe_name = (_rpt_name[0] or "report").replace(" ", "_").replace("/", "_")
+            fname = f"{safe_name}_prototype.svg"
+            path = f"{local_path}/Files/{fname}"
             with open(path, "w", encoding="utf-8") as f:
                 f.write(_svg_cache[0])
-            set_status(conn_status, "\u2713 Saved report_prototype.svg to lakehouse Files.", "#34c759")
+            set_status(conn_status, f"\u2713 Saved {fname} to lakehouse Files.", "#34c759")
         except Exception as e:
             set_status(conn_status, f"Error saving: {e}", "#ff3b30")
 
