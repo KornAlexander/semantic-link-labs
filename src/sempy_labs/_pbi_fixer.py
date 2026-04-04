@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.128"
+__version__ = "1.2.129"
 
 import ipywidgets as widgets
 import io
@@ -1389,7 +1389,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
                         else:
                             export_errors.append(f"'{pg['display_name']}': file not found")
                     except Exception as e:
-                        export_errors.append(f"'{pg['display_name']}': {str(e)[:80]}")
+                        export_errors.append(f"'{pg['display_name']}': {str(e)[:200]}")
 
             # Build SVG
             set_status(conn_status, "Building diagram\u2026", GRAY_COLOR)
