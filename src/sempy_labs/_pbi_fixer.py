@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.137"
+__version__ = "1.2.138"
 
 import ipywidgets as widgets
 import io
@@ -1270,13 +1270,14 @@ def _prototype_tab(workspace_input=None, report_input=None):
     )
 
     generate_btn = widgets.Button(description="\U0001F4D0 Generate Prototype", button_style="primary", layout=widgets.Layout(width="200px"))
-    screenshots_cb = widgets.Checkbox(value=False, description="Export screenshots (requires Export API)", indent=False, layout=widgets.Layout(width="auto"))
+    screenshots_cb = widgets.Checkbox(value=False, description="Screenshots", indent=False, layout=widgets.Layout(width="auto"))
+    hidden_cb = widgets.Checkbox(value=False, description="Include hidden pages", indent=False, layout=widgets.Layout(width="auto"))
     export_excalidraw_btn = widgets.Button(description="\u2B07 Save .excalidraw", layout=widgets.Layout(width="150px", display="none"))
     export_svg_btn = widgets.Button(description="\u2B07 Save .svg", layout=widgets.Layout(width="120px", display="none"))
     conn_status = status_html()
 
     nav_row = widgets.HBox(
-        [generate_btn, screenshots_cb, export_excalidraw_btn, export_svg_btn, conn_status],
+        [generate_btn, screenshots_cb, hidden_cb, export_excalidraw_btn, export_svg_btn, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
@@ -1353,13 +1354,17 @@ def _prototype_tab(workspace_input=None, report_input=None):
             # Try to export each page as PNG (only if checkbox checked)
             total = len(pages_data)
             export_errors = []
+            include_hidden = hidden_cb.value
             if screenshots_cb.value:
-                visible_pages = [(idx, pg) for idx, pg in enumerate(pages_data) if not pg["hidden"]]
+                target_pages = [(idx, pg) for idx, pg in enumerate(pages_data) if include_hidden or not pg["hidden"]]
                 from sempy_labs._helper_functions import _mount
                 local_path = _mount()
-                import os
-                for seq, (idx, pg) in enumerate(visible_pages):
-                    set_status(conn_status, f"Exporting {seq+1}/{len(visible_pages)}: '{pg['display_name']}'\u2026", GRAY_COLOR)
+                import os, threading
+                set_status(conn_status, f"Exporting {len(target_pages)} pages in parallel\u2026", GRAY_COLOR)
+
+                _lock = threading.Lock()
+
+                def _export_page(idx, pg):
                     try:
                         import io as _io
                         from contextlib import redirect_stdout as _redirect
@@ -1377,12 +1382,21 @@ def _prototype_tab(workspace_input=None, report_input=None):
                         if os.path.exists(png_path):
                             with open(png_path, "rb") as f:
                                 png_bytes = f.read()
-                            _page_images[pg["name"]] = base64.b64encode(png_bytes).decode("ascii")
+                            with _lock:
+                                _page_images[pg["name"]] = base64.b64encode(png_bytes).decode("ascii")
                             os.remove(png_path)
                         else:
-                            export_errors.append(f"'{pg['display_name']}': file not found")
+                            with _lock:
+                                export_errors.append(f"'{pg['display_name']}': file not found")
                     except Exception as e:
-                        export_errors.append(f"'{pg['display_name']}': {str(e)[:300]}")
+                        with _lock:
+                            export_errors.append(f"'{pg['display_name']}': {str(e)[:300]}")
+
+                threads = [threading.Thread(target=_export_page, args=(idx, pg)) for idx, pg in target_pages]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
 
             # Build SVG
             set_status(conn_status, "Building diagram\u2026", GRAY_COLOR)
@@ -1405,7 +1419,8 @@ def _prototype_tab(workspace_input=None, report_input=None):
         """Build SVG + Excalidraw JSON from page metadata and images."""
         import json, uuid, base64
 
-        visible = [p for p in pages if not p["hidden"]]
+        include_hidden = hidden_cb.value
+        visible = [p for p in pages if include_hidden or not p["hidden"]]
         n = len(visible)
         cols = min(_COLS, n)
         rows_count = (n + cols - 1) // cols
