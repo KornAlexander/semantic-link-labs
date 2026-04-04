@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.135"
+__version__ = "1.2.136"
 
 import ipywidgets as widgets
 import io
@@ -1354,35 +1354,26 @@ def _prototype_tab(workspace_input=None, report_input=None):
             total = len(pages_data)
             export_errors = []
             if screenshots_cb.value:
-                import threading
                 visible_pages = [(idx, pg) for idx, pg in enumerate(pages_data) if not pg["hidden"]]
-                set_status(conn_status, f"Exporting {len(visible_pages)} pages in parallel\u2026", GRAY_COLOR)
-
-                def _export_one(idx, pg):
+                from sempy_labs._helper_functions import _mount
+                local_path = _mount()
+                import os
+                for seq, (idx, pg) in enumerate(visible_pages):
+                    set_status(conn_status, f"Exporting {seq+1}/{len(visible_pages)}: '{pg['display_name']}'\u2026", GRAY_COLOR)
                     try:
                         import io as _io
                         from contextlib import redirect_stdout as _redirect
-                        import IPython.display as _ipd
-                        _orig = _ipd.display
-                        _ipd.display = lambda *a, **kw: None
                         buf = _io.StringIO()
-                        try:
-                            with _redirect(buf):
-                                from sempy_labs.report import export_report
-                                export_report(
-                                    report=rpt,
-                                    export_format="PNG",
-                                    file_name=f"_prototype_{idx:02d}",
-                                    page_name=pg["name"],
-                                    workspace=ws,
-                                )
-                        finally:
-                            _ipd.display = _orig
-
-                        from sempy_labs._helper_functions import _mount
-                        local_path = _mount()
+                        with _redirect(buf):
+                            from sempy_labs.report import export_report
+                            export_report(
+                                report=rpt,
+                                export_format="PNG",
+                                file_name=f"_prototype_{idx:02d}",
+                                page_name=pg["name"],
+                                workspace=ws,
+                            )
                         png_path = f"{local_path}/Files/_prototype_{idx:02d}.png"
-                        import os
                         if os.path.exists(png_path):
                             with open(png_path, "rb") as f:
                                 png_bytes = f.read()
@@ -1391,15 +1382,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
                         else:
                             export_errors.append(f"'{pg['display_name']}': file not found")
                     except Exception as e:
-                        export_errors.append(f"'{pg['display_name']}': {str(e)[:500]}")
-
-                threads = []
-                for idx, pg in visible_pages:
-                    t = threading.Thread(target=_export_one, args=(idx, pg))
-                    t.start()
-                    threads.append(t)
-                for t in threads:
-                    t.join()
+                        export_errors.append(f"'{pg['display_name']}': {str(e)[:300]}")
 
             # Build SVG
             set_status(conn_status, "Building diagram\u2026", GRAY_COLOR)
