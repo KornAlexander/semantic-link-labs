@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.134"
+__version__ = "1.2.135"
 
 import ipywidgets as widgets
 import io
@@ -1497,12 +1497,44 @@ def _prototype_tab(workspace_input=None, report_input=None):
                 "textAlign": "left", "verticalAlign": "top",
                 "rawText": label,
             })
+            # Excalidraw: visual count badge (top-right of header)
+            exc_elements.append({
+                "type": "text", "id": str(uuid.uuid4()),
+                "x": x + _THUMB_W - 80, "y": y + 5,
+                "width": 70, "height": 20,
+                "text": badge_text, "fontSize": 11, "fontFamily": 1,
+                "textAlign": "right", "verticalAlign": "top",
+                "rawText": badge_text,
+            })
 
             # Footer: page size
             footer_y = img_y + _THUMB_H + 3
             svg_parts.append(f'<text x="{x + 5}" y="{footer_y + 14}" font-family="{FONT_FAMILY}" font-size="10" fill="#9ca3af">{pg["width"]}\u00d7{pg["height"]}</text>')
             dt_label = "Drillthrough" if pg["drillthrough"] else ""
             svg_parts.append(f'<text x="{x + _THUMB_W - 5}" y="{footer_y + 14}" font-family="{FONT_FAMILY}" font-size="10" fill="{colors["text"]}" text-anchor="end">{dt_label}</text>')
+
+            # Excalidraw: footer - page size
+            size_text = f'{pg["width"]}\u00d7{pg["height"]}'
+            exc_elements.append({
+                "type": "text", "id": str(uuid.uuid4()),
+                "x": x + 5, "y": footer_y,
+                "width": 100, "height": 20,
+                "text": size_text, "fontSize": 10, "fontFamily": 1,
+                "textAlign": "left", "verticalAlign": "top",
+                "strokeColor": "#9ca3af",
+                "rawText": size_text,
+            })
+            # Excalidraw: footer - drillthrough label
+            if dt_label:
+                exc_elements.append({
+                    "type": "text", "id": str(uuid.uuid4()),
+                    "x": x + _THUMB_W - 100, "y": footer_y,
+                    "width": 95, "height": 20,
+                    "text": dt_label, "fontSize": 10, "fontFamily": 1,
+                    "textAlign": "right", "verticalAlign": "top",
+                    "strokeColor": colors["text"],
+                    "rawText": dt_label,
+                })
 
         # Draw navigation arrows for drillthrough pages
         dt_pages = {p["name"]: i for i, p in enumerate(visible) if p["drillthrough"]}
