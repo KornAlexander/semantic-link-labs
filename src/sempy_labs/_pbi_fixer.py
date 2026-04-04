@@ -1389,7 +1389,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
                         else:
                             export_errors.append(f"'{pg['display_name']}': file not found")
                     except Exception as e:
-                        export_errors.append(f"'{pg['display_name']}': {str(e)[:200]}")
+                        export_errors.append(f"'{pg['display_name']}': {str(e)[:500]}")
 
             # Build SVG
             set_status(conn_status, "Building diagram\u2026", GRAY_COLOR)
@@ -1399,7 +1399,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
             svg_display.value = svg
             export_excalidraw_btn.layout.display = ""
             export_svg_btn.layout.display = ""
-            err_msg = f" Export errors: {'; '.join(export_errors[:3])}" if export_errors else ""
+            err_msg = f" Export errors: {'; '.join(export_errors[:2])}" if export_errors else ""
             set_status(conn_status, f"\u2713 Prototype: {total} pages, {len(_page_images)} screenshots.{err_msg}", "#34c759" if not export_errors else "#ff9500")
 
         except Exception as e:
