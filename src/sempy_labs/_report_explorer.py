@@ -238,12 +238,7 @@ def _get_properties_html(report_data, key):
     if node_type == "page":
         p = _resolve_page(report_data, parts[1]) or {}
         display_name = parts[1].split("\x1f")[-1] if "\x1f" in parts[1] else parts[1]
-        rows = _prop_row("Display Name", p.get("display_name", display_name))
-        rows += _prop_row("Internal Name", display_name)
-        rows += _prop_row("Width", str(p.get("width", 0)))
-        rows += _prop_row("Height", str(p.get("height", 0)))
-        rows += _prop_row("Size", f"{p.get('width', 0)} \u00d7 {p.get('height', 0)}")
-        rows += _prop_row("Hidden", str(p.get("hidden", False)))
+        rows = _prop_row("Internal Name", display_name)
         rows += _prop_row("Visual Count", str(len(p.get("visuals", {}))))
         type_counts = {}
         for v in p.get("visuals", {}).values():
@@ -259,16 +254,10 @@ def _get_properties_html(report_data, key):
         v_name = parts[2] if len(parts) > 2 else ""
         p = _resolve_page(report_data, p_key) or {}
         v = p.get("visuals", {}).get(v_name, {})
-        rows = _prop_row("Type", v.get("type", ""))
-        rows += _prop_row("Display Type", v.get("display_type", ""))
-        if v.get("title"):
-            rows += _prop_row("Title", v["title"])
+        rows = _prop_row("Display Type", v.get("display_type", ""))
         rows += _prop_row("Internal Name", v_name)
         p_display = p_key.split("\x1f")[-1] if "\x1f" in p_key else p_key
         rows += _prop_row("Page", p.get("display_name", p_display))
-        rows += _prop_row("Position", f"x={v.get('x', 0)}, y={v.get('y', 0)}")
-        rows += _prop_row("Size", f"{v.get('width', 0)} \u00d7 {v.get('height', 0)}")
-        rows += _prop_row("Hidden", str(v.get("hidden", False)))
 
         # Show used semantic model objects
         p_name_raw = p_key.split("\x1f")[-1] if "\x1f" in p_key else p_key
@@ -563,19 +552,28 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
             page_props.layout.display = ""
 
         elif node_type == "visual":
-            v_raw = key.split(":", 1)[1]
-            v_parts = v_raw.rsplit("\x1f", 1)
-            p_key = v_parts[0] if len(v_parts) > 1 else ""
-            v_name = v_parts[-1]
+            parts = key.split(":", 2)
+            p_key = parts[1] if len(parts) > 1 else ""
+            v_name = parts[2] if len(parts) > 2 else ""
             pages = _report_data.get("pages", {})
             if not pages and _report_data.get("reports"):
                 for rd in _report_data["reports"].values():
                     pages.update(rd.get("pages", {}))
             v = {}
-            for p_data in pages.values():
-                if v_name in p_data.get("visuals", {}):
-                    v = p_data["visuals"][v_name]
-                    break
+            # resolve page via _resolve_page-style lookup
+            p = None
+            if "\x1f" in p_key:
+                _, raw_pname = p_key.split("\x1f", 1)
+                p = pages.get(raw_pname, {})
+            else:
+                p = pages.get(p_key, {})
+            if p:
+                v = p.get("visuals", {}).get(v_name, {})
+            if not v:
+                for p_data in pages.values():
+                    if v_name in p_data.get("visuals", {}):
+                        v = p_data["visuals"][v_name]
+                        break
             rp_type.value = v.get("type", "")
             rp_title.value = v.get("title", "")
             rp_x.value = int(v.get("x", 0))
@@ -1168,8 +1166,8 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
     scan_btn.on_click(on_scan)
     run_action_btn.on_click(on_run_action)
 
-    # --- Format Overview panel (subtab within Report Explorer) ---
-    format_btn = widgets.Button(description="\U0001F4CB Format Overview", layout=widgets.Layout(width="160px"))
+    # --- PBIR Status panel (rendered below PBI Fixer container) ---
+    format_btn = widgets.Button(description="\U0001F4CB PBIR Status", layout=widgets.Layout(width="130px"))
     convert_all_btn = widgets.Button(description="\u26A1 Convert All Legacy", button_style="danger", layout=widgets.Layout(width="180px", display="none"))
     format_html = widgets.HTML(value="")
     format_container = widgets.VBox(
@@ -1190,8 +1188,8 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
         _format_data.clear()
         try:
             rpt_list = _list_workspace_reports(ws)
-            html = '<table style="border-collapse:collapse; width:100%; font-size:12px; font-family:monospace;">'
-            html += '<tr style="background:#f5f5f5;"><th style="padding:4px 8px; text-align:left;">Report</th><th style="padding:4px 8px; text-align:left;">Format</th></tr>'
+            html = '<table style="border-collapse:collapse; font-size:12px; font-family:monospace;">'
+            html += '<tr style="background:#f5f5f5;"><th style="padding:3px 12px 3px 8px; text-align:left;">Report</th><th style="padding:3px 8px; text-align:left;">Format</th></tr>'
             n_legacy = 0
             for name, fmt in rpt_list:
                 _format_data.append((name, fmt))
@@ -1202,8 +1200,8 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
                     n_legacy += 1
                 else:
                     badge = f'<span style="color:#888;">{fmt or "unknown"}</span>'
-                html += f'<tr><td style="padding:3px 8px; border-bottom:1px solid #f0f0f0;">{name}</td>'
-                html += f'<td style="padding:3px 8px; border-bottom:1px solid #f0f0f0;">{badge}</td></tr>'
+                html += f'<tr><td style="padding:2px 12px 2px 8px; border-bottom:1px solid #f0f0f0; white-space:nowrap;">{name}</td>'
+                html += f'<td style="padding:2px 8px; border-bottom:1px solid #f0f0f0; white-space:nowrap;">{badge}</td></tr>'
             html += '</table>'
             html += f'<div style="font-size:11px; color:#555; margin-top:4px;">{len(rpt_list)} report(s), {n_legacy} legacy</div>'
             format_html.value = html
@@ -1217,7 +1215,7 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
             format_html.value = f'<div style="color:#ff3b30;">Error: {str(e)[:100]}</div>'
             format_container.layout.display = ""
         format_btn.disabled = False
-        format_btn.description = "\U0001F4CB Format Overview"
+        format_btn.description = "\U0001F4CB PBIR Status"
 
     def _on_convert_all(_):
         ws = workspace_input.value.strip() if workspace_input else None
@@ -1255,5 +1253,7 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
         layout=widgets.Layout(align_items="center", gap="8px", margin="4px 0 0 0"),
     )
 
-    widget = widgets.VBox([nav_row, action_row, tree_header, panels, format_row, format_container], layout=widgets.Layout(padding="12px", gap="4px"))
+    widget = widgets.VBox([nav_row, action_row, tree_header, panels, format_row], layout=widgets.Layout(padding="12px", gap="4px"))
+    # Expose format_container for external placement (below the main PBI Fixer UI)
+    widget._format_container = format_container
     return widget, on_load
