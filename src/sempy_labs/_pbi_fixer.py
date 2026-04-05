@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.153"
+__version__ = "1.2.154"
 
 import ipywidgets as widgets
 import io
@@ -2289,9 +2289,15 @@ def pbi_fixer(
         try:
             from sempy_labs.report._report_functions import clone_report as _clone_rpt
             cloned = f"{rpt}_copy"
-            _clone_rpt(report=rpt, cloned_report=cloned, workspace=ws)
+            import warnings as _w, sys as _s, io as _sio
+            _old = _s.stdout; _s.stdout = _sio.StringIO()
+            with _w.catch_warnings():
+                _w.simplefilter("ignore")
+                _clone_rpt(report=rpt, cloned_report=cloned, workspace=ws)
+            _s.stdout = _old
             download_status.value = f'<span style="color:#34c759; font-size:12px;">\u2713 Report cloned as \'{cloned}\'.</span>'
         except Exception as e:
+            _s.stdout = _old
             download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:200]}</span>'
         clone_rpt_btn.disabled = False
 
@@ -2304,10 +2310,16 @@ def pbi_fixer(
         ds = rpt.split(",")[0].strip()
         clone_model_btn.disabled = True
         download_status.value = f'<span style="color:#999; font-size:12px;">Cloning model\u2026</span>'
+        import warnings as _w, sys as _s, io as _sio
+        _old = _s.stdout; _s.stdout = _sio.StringIO()
         try:
-            cloned_name = _clone_semantic_model_impl(ds, ws)
+            with _w.catch_warnings():
+                _w.simplefilter("ignore")
+                cloned_name = _clone_semantic_model_impl(ds, ws)
+            _s.stdout = _old
             download_status.value = f'<span style="color:#34c759; font-size:12px;">\u2713 Model cloned as \'{cloned_name}\'.</span>'
         except Exception as e:
+            _s.stdout = _old
             download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:200]}</span>'
         clone_model_btn.disabled = False
 
@@ -2376,19 +2388,25 @@ def pbi_fixer(
             download_status.value = f'<span style="color:#999; font-size:12px;">Cloning model + report\u2026</span>'
 
         ds = model_name or rpt
+        import warnings as _w, sys as _s, io as _sio
+        _old = _s.stdout; _s.stdout = _sio.StringIO()
         try:
-            # 1. Clone model
-            download_status.value = f'<span style="color:#999; font-size:12px;">Cloning model \'{ds}\'\u2026</span>'
-            cloned_ds = _clone_semantic_model_impl(ds, ws)
-            # 2. Clone report, rebound to new model
-            download_status.value = f'<span style="color:#999; font-size:12px;">Cloning report \'{rpt}\'\u2026</span>'
-            from sempy_labs.report._report_functions import clone_report as _clone_rpt
-            _clone_rpt(report=rpt, cloned_report=f"{rpt}_copy", workspace=ws, target_dataset=cloned_ds)
+            with _w.catch_warnings():
+                _w.simplefilter("ignore")
+                # 1. Clone model
+                download_status.value = f'<span style="color:#999; font-size:12px;">Cloning model \'{ds}\'\u2026</span>'
+                cloned_ds = _clone_semantic_model_impl(ds, ws)
+                # 2. Clone report, rebound to new model
+                download_status.value = f'<span style="color:#999; font-size:12px;">Cloning report \'{rpt}\'\u2026</span>'
+                from sempy_labs.report._report_functions import clone_report as _clone_rpt
+                _clone_rpt(report=rpt, cloned_report=f"{rpt}_copy", workspace=ws, target_dataset=cloned_ds)
+            _s.stdout = _old
             download_status.value = (
                 f'<span style="color:#34c759; font-size:12px;">'
                 f'\u2713 Cloned \'{rpt}_copy\' + \'{cloned_ds}\'.</span>'
             )
         except Exception as e:
+            _s.stdout = _old
             download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:200]}</span>'
         clone_both_btn.disabled = False
 
