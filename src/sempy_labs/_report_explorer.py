@@ -558,80 +558,85 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
         _cancel_load[0] = False
         set_status(conn_status, f"Loading {len(items)} report(s)\u2026", GRAY_COLOR)
 
-        start_time = time.time()
-        loaded = 0
-        errors = 0
+        def _load_bg():
+            nonlocal _report_data, _key_map
+            start_time = time.time()
+            loaded = 0
+            errors = 0
 
-        try:
-            if len(items) == 1:
-                # Single report: load into flat structure
-                _report_data = _load_with_pbir_gate(rpt_name=items[0], ws=ws)
-                loaded = 1
-            else:
-                # Multi-report: load each into grouped structure
-                merged = {"pages": {}, "reports": {}, "report_id": "", "workspace_id": ""}
-                for i, rpt in enumerate(items):
-                    if _cancel_load[0]:
-                        set_status(conn_status, f"\u23f9 Stopped after {loaded}/{len(items)} reports.", "#ff9500")
-                        break
-                    if time.time() - start_time > _LOAD_TIMEOUT:
-                        set_status(conn_status, f"\u23f1\ufe0f Timeout after {loaded}/{len(items)}.", "#ff9500")
-                        break
-                    set_status(conn_status, f"Report {i+1}/{len(items)}: loading '{rpt}'\u2026", GRAY_COLOR)
-                    try:
-                        data = _load_with_pbir_gate(rpt_name=rpt, ws=ws)
-                        merged["reports"][rpt] = data
-                        if not merged["report_id"]:
-                            merged["report_id"] = data.get("report_id", "")
-                            merged["workspace_id"] = data.get("workspace_id", "")
-                        loaded += 1
-                    except Exception:
-                        errors += 1
-                        set_status(conn_status, f"Report {i+1}/{len(items)}: '{rpt}' failed", "#ff9500")
-                _report_data = merged
+            try:
+                if len(items) == 1:
+                    # Single report: load into flat structure
+                    _report_data = _load_with_pbir_gate(rpt_name=items[0], ws=ws)
+                    loaded = 1
+                else:
+                    # Multi-report: load each into grouped structure
+                    merged = {"pages": {}, "reports": {}, "report_id": "", "workspace_id": ""}
+                    for i, rpt in enumerate(items):
+                        if _cancel_load[0]:
+                            set_status(conn_status, f"\u23f9 Stopped after {loaded}/{len(items)} reports.", "#ff9500")
+                            break
+                        if time.time() - start_time > _LOAD_TIMEOUT:
+                            set_status(conn_status, f"\u23f1\ufe0f Timeout after {loaded}/{len(items)}.", "#ff9500")
+                            break
+                        set_status(conn_status, f"Report {i+1}/{len(items)}: loading '{rpt}'\u2026", GRAY_COLOR)
+                        try:
+                            data = _load_with_pbir_gate(rpt_name=rpt, ws=ws)
+                            merged["reports"][rpt] = data
+                            if not merged["report_id"]:
+                                merged["report_id"] = data.get("report_id", "")
+                                merged["workspace_id"] = data.get("workspace_id", "")
+                            loaded += 1
+                        except Exception:
+                            errors += 1
+                            set_status(conn_status, f"Report {i+1}/{len(items)}: '{rpt}' failed", "#ff9500")
+                    _report_data = merged
 
-            # Auto-expand all items after load
-            if _report_data.get("reports"):
-                for r_name, r_data in _report_data["reports"].items():
-                    _expanded.add(r_name)
-                    for p_name in r_data.get("pages", {}):
-                        _expanded.add(f"{r_name}\x1f{p_name}")
-            else:
-                _expanded.update(_report_data.get("pages", {}).keys())
+                # Auto-expand all items after load
+                if _report_data.get("reports"):
+                    for r_name, r_data in _report_data["reports"].items():
+                        _expanded.add(r_name)
+                        for p_name in r_data.get("pages", {}):
+                            _expanded.add(f"{r_name}\x1f{p_name}")
+                else:
+                    _expanded.update(_report_data.get("pages", {}).keys())
 
-            _refresh_tree()
+                _refresh_tree()
 
-            # Compute stats
-            total_pages = 0
-            total_visuals = 0
-            if _report_data.get("reports"):
-                for r in _report_data["reports"].values():
-                    total_pages += len(r.get("pages", {}))
-                    total_visuals += sum(len(p["visuals"]) for p in r.get("pages", {}).values())
-            else:
-                total_pages = len(_report_data.get("pages", {}))
-                total_visuals = sum(len(p["visuals"]) for p in _report_data.get("pages", {}).values())
+                # Compute stats
+                total_pages = 0
+                total_visuals = 0
+                if _report_data.get("reports"):
+                    for r in _report_data["reports"].values():
+                        total_pages += len(r.get("pages", {}))
+                        total_visuals += sum(len(p["visuals"]) for p in r.get("pages", {}).values())
+                else:
+                    total_pages = len(_report_data.get("pages", {}))
+                    total_visuals = sum(len(p["visuals"]) for p in _report_data.get("pages", {}).values())
 
-            elapsed = int(time.time() - start_time)
-            err_str = f", {errors} error(s)" if errors else ""
-            set_status(conn_status, f"Loaded {loaded}/{len(items)}: {total_pages} pages, {total_visuals} visuals ({elapsed}s{err_str})", "#34c759")
+                elapsed = int(time.time() - start_time)
+                err_str = f", {errors} error(s)" if errors else ""
+                set_status(conn_status, f"Loaded {loaded}/{len(items)}: {total_pages} pages, {total_visuals} visuals ({elapsed}s{err_str})", "#34c759")
 
-            # Initialize preview for first report
-            report_id = _report_data.get("report_id", "")
-            workspace_id = _report_data.get("workspace_id", "")
-            if not report_id and _report_data.get("reports"):
-                first = next(iter(_report_data["reports"].values()), {})
-                report_id = first.get("report_id", "")
-                workspace_id = first.get("workspace_id", "")
-            if report_id and workspace_id:
-                _show_widget(report_id, workspace_id)
-        except Exception as e:
-            set_status(conn_status, f"Error: {e}", "#ff3b30")
-        finally:
-            load_btn.disabled = False
-            load_btn.description = "Load Report"
-            stop_btn.layout.display = "none"
-            _cancel_load[0] = False
+                # Initialize preview for first report
+                report_id = _report_data.get("report_id", "")
+                workspace_id = _report_data.get("workspace_id", "")
+                if not report_id and _report_data.get("reports"):
+                    first = next(iter(_report_data["reports"].values()), {})
+                    report_id = first.get("report_id", "")
+                    workspace_id = first.get("workspace_id", "")
+                if report_id and workspace_id:
+                    _show_widget(report_id, workspace_id)
+            except Exception as e:
+                set_status(conn_status, f"Error: {e}", "#ff3b30")
+            finally:
+                load_btn.disabled = False
+                load_btn.description = "Load Report"
+                stop_btn.layout.display = "none"
+                _cancel_load[0] = False
+
+        import threading
+        threading.Thread(target=_load_bg, daemon=True).start()
 
     def on_select(change):
         selected = change.get("new", ())

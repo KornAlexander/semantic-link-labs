@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.160"
+__version__ = "1.2.161"
 
 import ipywidgets as widgets
 import io
@@ -166,43 +166,50 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
             return
         load_btn.disabled = True
         load_btn.description = "Loading\u2026"
-        _vp_data = {}
-        import io as _io
-        from contextlib import redirect_stdout as _redirect
-        for i, ds in enumerate(items):
-            set_status(conn_status, f"Memory Analyzer {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
-            try:
-                import IPython.display as _ipd
-                _orig = _ipd.display
-                _ipd.display = lambda *a, **kw: None
+        read_stats_val = read_stats_cb.value
+
+        def _load_bg():
+            nonlocal _vp_data
+            _vp_data = {}
+            import io as _io
+            from contextlib import redirect_stdout as _redirect
+            for i, ds in enumerate(items):
+                set_status(conn_status, f"Memory Analyzer {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
                 try:
-                    import IPython.core.display_functions as _idf
-                    _orig2 = _idf.display
-                    _idf.display = lambda *a, **kw: None
-                except: _idf = None; _orig2 = None
-                import sempy_labs._vertipaq as _vp_mod
-                _orig_vp = getattr(_vp_mod, 'display', None)
-                _vp_mod.display = lambda *a, **kw: None
-                try:
-                    buf = _io.StringIO()
-                    with _redirect(buf):
-                        from sempy_labs import vertipaq_analyzer
-                        result = vertipaq_analyzer(dataset=ds, workspace=ws, read_stats_from_data=read_stats_cb.value)
-                finally:
-                    _ipd.display = _orig
-                    if _idf and _orig2: _idf.display = _orig2
-                    if _orig_vp: _vp_mod.display = _orig_vp
-                _vp_data[ds] = result
-                _current_model[0] = ds
-            except Exception as e:
-                set_status(conn_status, f"Error loading '{ds}': {e}", "#ff3b30")
-        if _vp_data:
-            model_dropdown.options = list(_vp_data.keys())
-            model_dropdown.value = _current_model[0] or next(iter(_vp_data))
-        _render_subtab()
-        set_status(conn_status, f"\u2713 Loaded {len(_vp_data)} model(s).", "#34c759")
-        load_btn.disabled = False
-        load_btn.description = "Load Memory"
+                    import IPython.display as _ipd
+                    _orig = _ipd.display
+                    _ipd.display = lambda *a, **kw: None
+                    try:
+                        import IPython.core.display_functions as _idf
+                        _orig2 = _idf.display
+                        _idf.display = lambda *a, **kw: None
+                    except: _idf = None; _orig2 = None
+                    import sempy_labs._vertipaq as _vp_mod
+                    _orig_vp = getattr(_vp_mod, 'display', None)
+                    _vp_mod.display = lambda *a, **kw: None
+                    try:
+                        buf = _io.StringIO()
+                        with _redirect(buf):
+                            from sempy_labs import vertipaq_analyzer
+                            result = vertipaq_analyzer(dataset=ds, workspace=ws, read_stats_from_data=read_stats_val)
+                    finally:
+                        _ipd.display = _orig
+                        if _idf and _orig2: _idf.display = _orig2
+                        if _orig_vp: _vp_mod.display = _orig_vp
+                    _vp_data[ds] = result
+                    _current_model[0] = ds
+                except Exception as e:
+                    set_status(conn_status, f"Error loading '{ds}': {e}", "#ff3b30")
+            if _vp_data:
+                model_dropdown.options = list(_vp_data.keys())
+                model_dropdown.value = _current_model[0] or next(iter(_vp_data))
+            _render_subtab()
+            set_status(conn_status, f"\u2713 Loaded {len(_vp_data)} model(s).", "#34c759")
+            load_btn.disabled = False
+            load_btn.description = "Load Memory"
+
+        import threading
+        threading.Thread(target=_load_bg, daemon=True).start()
 
     load_btn.on_click(on_load)
 
@@ -540,49 +547,55 @@ def _bpa_tab(workspace_input=None, report_input=None):
             return
         load_btn.disabled = True
         load_btn.description = "Scanning\u2026"
-        import io as _io
-        from contextlib import redirect_stdout as _redirect
-        import IPython.display as _ipd
-        _orig_display = _ipd.display
 
-        _all_findings = []
+        def _bpa_bg():
+            nonlocal _all_findings
+            import io as _io
+            from contextlib import redirect_stdout as _redirect
+            import IPython.display as _ipd
+            _orig_display = _ipd.display
 
-        for i, ds in enumerate(items):
-            set_status(conn_status, f"BPA {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
-            try:
-                buf = _io.StringIO()
-                _ipd.display = lambda *a, **kw: None
+            _all_findings = []
+
+            for i, ds in enumerate(items):
+                set_status(conn_status, f"BPA {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
                 try:
-                    with _redirect(buf):
-                        from sempy_labs import run_model_bpa
-                        df = run_model_bpa(dataset=ds, workspace=ws, return_dataframe=True)
-                finally:
-                    _ipd.display = _orig_display
+                    buf = _io.StringIO()
+                    _ipd.display = lambda *a, **kw: None
+                    try:
+                        with _redirect(buf):
+                            from sempy_labs import run_model_bpa
+                            df = run_model_bpa(dataset=ds, workspace=ws, return_dataframe=True)
+                    finally:
+                        _ipd.display = _orig_display
 
-                if df is not None and len(df) > 0:
-                    for _, row in df.iterrows():
-                        rule_name = str(row.get("Rule Name", ""))
-                        category = str(row.get("Category", ""))
-                        obj_name = str(row.get("Object Name", ""))
-                        obj_type = str(row.get("Object Type", ""))
-                        severity = str(row.get("Severity", ""))
-                        _all_findings.append((ds, rule_name, category, obj_name, obj_type, severity))
-            except Exception as e:
-                _all_findings.append((ds, f"ERROR: {e}", "Error", "", "", "3"))
+                    if df is not None and len(df) > 0:
+                        for _, row in df.iterrows():
+                            rule_name = str(row.get("Rule Name", ""))
+                            category = str(row.get("Category", ""))
+                            obj_name = str(row.get("Object Name", ""))
+                            obj_type = str(row.get("Object Type", ""))
+                            severity = str(row.get("Severity", ""))
+                            _all_findings.append((ds, rule_name, category, obj_name, obj_type, severity))
+                except Exception as e:
+                    _all_findings.append((ds, f"ERROR: {e}", "Error", "", "", "3"))
 
-        # Render native-style HTML with ipywidgets category tabs
-        _render_native_bpa(_all_findings)
+            # Render native-style HTML with ipywidgets category tabs
+            _render_native_bpa(_all_findings)
 
-        _update_rule_dropdown()
-        n = len([f for f in _all_findings if not f[1].startswith("ERROR")])
-        n_fixable = sum(1 for f in _all_findings if _is_fixable(f[1], f[4]))
-        results_box.children = [widgets.HTML(
-            value=f'<div style="font-size:12px; font-family:{FONT_FAMILY}; color:#555; margin:8px 0 4px 0;">'
-            f'{n} finding(s), <b>{n_fixable}</b> auto-fixable</div>'
-        )]
-        set_status(conn_status, f"\u2713 BPA: {n} finding(s) across {len(items)} model(s).", "#34c759" if n == 0 else "#ff9500")
-        load_btn.disabled = False
-        load_btn.description = "Run BPA"
+            _update_rule_dropdown()
+            n = len([f for f in _all_findings if not f[1].startswith("ERROR")])
+            n_fixable = sum(1 for f in _all_findings if _is_fixable(f[1], f[4]))
+            results_box.children = [widgets.HTML(
+                value=f'<div style="font-size:12px; font-family:{FONT_FAMILY}; color:#555; margin:8px 0 4px 0;">'
+                f'{n} finding(s), <b>{n_fixable}</b> auto-fixable</div>'
+            )]
+            set_status(conn_status, f"\u2713 BPA: {n} finding(s) across {len(items)} model(s).", "#34c759" if n == 0 else "#ff9500")
+            load_btn.disabled = False
+            load_btn.description = "Run BPA"
+
+        import threading
+        threading.Thread(target=_bpa_bg, daemon=True).start()
 
     def _update_rule_dropdown():
         """Populate rule dropdown with fixable rules + counts."""
@@ -1337,9 +1350,12 @@ def _prototype_tab(workspace_input=None, report_input=None):
         _cancel_proto[0] = False
         _page_images.clear()
         _rpt_name[0] = rpt
+        screenshots_val = screenshots_cb.value
+        hidden_val = hidden_cb.value
 
-        try:
-            set_status(conn_status, "Generating prototype\u2026", GRAY_COLOR)
+        def _generate_bg():
+            try:
+                set_status(conn_status, "Generating prototype\u2026", GRAY_COLOR)
 
             def _proto_progress(done, total, page_name):
                 set_status(conn_status, f"Exporting screenshots: {done}/{total} \u2014 {page_name}", GRAY_COLOR)
@@ -1349,8 +1365,8 @@ def _prototype_tab(workspace_input=None, report_input=None):
             result = generate_report_prototype(
                 report=rpt,
                 workspace=ws,
-                screenshots=screenshots_cb.value,
-                include_hidden=hidden_cb.value,
+                screenshots=screenshots_val,
+                include_hidden=hidden_val,
                 on_progress=_proto_progress,
             )
 
@@ -1368,13 +1384,16 @@ def _prototype_tab(workspace_input=None, report_input=None):
             err_msg = f" Export errors: {'; '.join(export_errors[:2])}" if export_errors else ""
             set_status(conn_status, f"\u2713 Prototype: {total} pages, {n_screenshots} screenshots.{err_msg}", "#34c759" if not export_errors else "#ff9500")
 
-        except Exception as e:
-            set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
-        finally:
-            generate_btn.disabled = False
-            generate_btn.description = "\U0001F4D0 Generate Prototype"
-            stop_proto_btn.layout.display = "none"
-            _cancel_proto[0] = False
+            except Exception as e:
+                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+            finally:
+                generate_btn.disabled = False
+                generate_btn.description = "\U0001F4D0 Generate Prototype"
+                stop_proto_btn.layout.display = "none"
+                _cancel_proto[0] = False
+
+        import threading
+        threading.Thread(target=_generate_bg, daemon=True).start()
 
     def _on_export_excalidraw(_):
         if not _excalidraw_cache[0]:
