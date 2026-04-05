@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.172"
+__version__ = "1.2.173"
 
 import ipywidgets as widgets
 import io
@@ -453,91 +453,92 @@ def _translations_tab(workspace_input=None, report_input=None):
         auto_translate_btn.disabled = True
         auto_translate_btn.description = "Translating…"
 
-        try:
-            from synapse.ml.services import Translate
-            from pyspark.sql.types import StructType, StructField, StringType
-            from pyspark.sql.functions import flatten, col
-            from sempy_labs._helper_functions import _create_spark_session
+        def _translate_bg():
+            try:
+                from synapse.ml.services import Translate
+                from pyspark.sql.types import StructType, StructField, StringType
+                from pyspark.sql.functions import flatten, col
+                from sempy_labs._helper_functions import _create_spark_session
 
-            set_status(conn_status, "Initializing Spark session…", GRAY_COLOR)
-            spark = _create_spark_session()
-            total = 0
-            lang_count = len(_languages)
-            translated_langs = 0
+                set_status(conn_status, "Initializing Spark session…", GRAY_COLOR)
+                spark = _create_spark_session()
+                total = 0
+                lang_count = len(_languages)
+                translated_langs = 0
 
-            for lang_idx, lang in enumerate(_languages):
-                # Convert locale (de-DE → de)
-                target_lang = lang.split("-")[0].lower()
-                if target_lang == "en":
+                for lang_idx, lang in enumerate(_languages):
+                    target_lang = lang.split("-")[0].lower()
+                    if target_lang == "en":
+                        translated_langs += 1
+                        continue
+
+                    to_translate = []
+                    keys_to_update = []
+                    for obj_type, table_name, obj_name, _ in _objects:
+                        key = _obj_key(obj_type, table_name, obj_name)
+                        if not _trans_data[key].get(lang):
+                            to_translate.append(obj_name)
+                            keys_to_update.append(key)
+
+                    if not to_translate:
+                        translated_langs += 1
+                        continue
+
+                    set_status(conn_status, f"Language {lang_idx+1}/{lang_count}: Translating {len(to_translate)} names → {lang}…", GRAY_COLOR)
+                    auto_translate_btn.description = f"{lang} ({lang_idx+1}/{lang_count})"
+
+                    _CHUNK_SIZE = 50
+                    schema = StructType([StructField("text", StringType(), True)])
+                    lang_translated = 0
+
+                    for chunk_start in range(0, len(to_translate), _CHUNK_SIZE):
+                        chunk_end = min(chunk_start + _CHUNK_SIZE, len(to_translate))
+                        chunk_names = to_translate[chunk_start:chunk_end]
+                        chunk_keys = keys_to_update[chunk_start:chunk_end]
+
+                        set_status(conn_status, f"{lang} ({lang_idx+1}/{lang_count}): {chunk_start}/{len(to_translate)} names…", GRAY_COLOR)
+
+                        df_names = spark.createDataFrame([(n,) for n in chunk_names], schema)
+                        translate = (
+                            Translate()
+                            .setTextCol("text")
+                            .setToLanguage(target_lang)
+                            .setOutputCol("translation")
+                            .setConcurrency(5)
+                        )
+                        df_result = (
+                            translate.transform(df_names)
+                            .withColumn("translation", flatten(col("translation.translations")))
+                            .withColumn("translation", col("translation.text"))
+                            .select("text", "translation")
+                        )
+
+                        results = df_result.collect()
+                        for row, key in zip(results, chunk_keys):
+                            translated_list = row["translation"]
+                            if translated_list and len(translated_list) > 0:
+                                _trans_data[key][lang] = str(translated_list[0])
+                                total += 1
+                                lang_translated += 1
+
+                        set_status(conn_status, f"{lang} ({lang_idx+1}/{lang_count}): {chunk_end}/{len(to_translate)} names translated", GRAY_COLOR)
+
                     translated_langs += 1
-                    continue
+                    set_status(conn_status, f"✓ {lang}: {lang_translated} translated ({translated_langs}/{lang_count} languages done)", "#34c759")
+                    _render_grid()
 
-                # Collect untranslated object names for this language
-                to_translate = []
-                keys_to_update = []
-                for obj_type, table_name, obj_name, _ in _objects:
-                    key = _obj_key(obj_type, table_name, obj_name)
-                    if not _trans_data[key].get(lang):
-                        to_translate.append(obj_name)
-                        keys_to_update.append(key)
+                _render_preview()
+                set_status(conn_status, f"✓ Auto-translated {total} names across {translated_langs} language(s) via Azure AI Translator.", "#34c759")
+            except ImportError:
+                set_status(conn_status, "SynapseML not available. Run in a Fabric Notebook.", "#ff3b30")
+            except Exception as e:
+                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+            finally:
+                auto_translate_btn.disabled = False
+                auto_translate_btn.description = "🌐 Auto-Translate"
 
-                if not to_translate:
-                    translated_langs += 1
-                    continue
-
-                set_status(conn_status, f"Language {lang_idx+1}/{lang_count}: Translating {len(to_translate)} names → {lang}…", GRAY_COLOR)
-                auto_translate_btn.description = f"{lang} ({lang_idx+1}/{lang_count})"
-
-                # Translate in chunks of 50 for progress visibility
-                _CHUNK_SIZE = 50
-                schema = StructType([StructField("text", StringType(), True)])
-                lang_translated = 0
-
-                for chunk_start in range(0, len(to_translate), _CHUNK_SIZE):
-                    chunk_end = min(chunk_start + _CHUNK_SIZE, len(to_translate))
-                    chunk_names = to_translate[chunk_start:chunk_end]
-                    chunk_keys = keys_to_update[chunk_start:chunk_end]
-
-                    set_status(conn_status, f"{lang} ({lang_idx+1}/{lang_count}): {chunk_start}/{len(to_translate)} names…", GRAY_COLOR)
-
-                    df_names = spark.createDataFrame([(n,) for n in chunk_names], schema)
-                    translate = (
-                        Translate()
-                        .setTextCol("text")
-                        .setToLanguage(target_lang)
-                        .setOutputCol("translation")
-                        .setConcurrency(5)
-                    )
-                    df_result = (
-                        translate.transform(df_names)
-                        .withColumn("translation", flatten(col("translation.translations")))
-                        .withColumn("translation", col("translation.text"))
-                        .select("text", "translation")
-                    )
-
-                    results = df_result.collect()
-                    for row, key in zip(results, chunk_keys):
-                        translated_list = row["translation"]
-                        if translated_list and len(translated_list) > 0:
-                            _trans_data[key][lang] = str(translated_list[0])
-                            total += 1
-                            lang_translated += 1
-
-                    set_status(conn_status, f"{lang} ({lang_idx+1}/{lang_count}): {chunk_end}/{len(to_translate)} names translated", GRAY_COLOR)
-
-                translated_langs += 1
-                set_status(conn_status, f"✓ {lang}: {lang_translated} translated ({translated_langs}/{lang_count} languages done)", "#34c759")
-                _render_grid()
-
-            _render_preview()
-            set_status(conn_status, f"✓ Auto-translated {total} names across {translated_langs} language(s) via Azure AI Translator.", "#34c759")
-        except ImportError:
-            set_status(conn_status, "SynapseML not available. Run in a Fabric Notebook.", "#ff3b30")
-        except Exception as e:
-            set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
-        finally:
-            auto_translate_btn.disabled = False
-            auto_translate_btn.description = "🌐 Auto-Translate"
+        import threading
+        threading.Thread(target=_translate_bg, daemon=True).start()
 
     def on_apply(_):
         ds = _ds_name[0]
