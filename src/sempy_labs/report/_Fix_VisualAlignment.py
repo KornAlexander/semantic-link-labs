@@ -5,14 +5,13 @@ from typing import Optional
 from uuid import UUID
 
 
-# Chart visual types to check for alignment
+# Chart visual types to check for alignment (actual data chart visuals only)
 _CHART_TYPES = {
     "barChart", "clusteredBarChart", "stackedBarChart", "hundredPercentStackedBarChart",
     "columnChart", "clusteredColumnChart", "stackedColumnChart", "hundredPercentStackedColumnChart",
     "lineChart", "areaChart", "stackedAreaChart", "lineStackedColumnComboChart",
-    "lineClusteredColumnComboChart", "waterfallChart", "funnelChart", "scatterChart",
-    "pieChart", "donutChart", "treemap", "map", "filledMap", "shape", "gauge",
-    "kpi", "multiRowCard", "card", "table", "matrix", "decompositionTreeVisual",
+    "lineClusteredColumnComboChart", "ribbonChart", "waterfallChart", "funnel",
+    "scatterChart", "pieChart", "donutChart",
 }
 
 
@@ -52,7 +51,9 @@ def fix_visual_alignment(
         pages_df = rw.list_pages()
         visuals_df = rw.list_visuals()
 
-        target_pages = pages_df if page_name is None else pages_df[pages_df["Page Display Name"] == page_name]
+        target_pages = pages_df if page_name is None else pages_df[
+            (pages_df["Page Display Name"] == page_name) | (pages_df["Page Name"] == page_name)
+        ]
 
         for _, page_row in target_pages.iterrows():
             p_name = str(page_row.get("Page Name", ""))
