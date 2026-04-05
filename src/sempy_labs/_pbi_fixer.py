@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.159"
+__version__ = "1.2.160"
 
 import ipywidgets as widgets
 import io
@@ -43,6 +43,7 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
     _current_model = [None]
 
     load_btn = widgets.Button(description="Load Memory", button_style="primary", layout=widgets.Layout(width="120px"))
+    read_stats_cb = widgets.Checkbox(value=False, description="Read stats from data (Direct Lake)", indent=False, layout=widgets.Layout(width="auto"))
     conn_status = status_html()
 
     model_dropdown = widgets.Dropdown(
@@ -186,7 +187,7 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
                     buf = _io.StringIO()
                     with _redirect(buf):
                         from sempy_labs import vertipaq_analyzer
-                        result = vertipaq_analyzer(dataset=ds, workspace=ws)
+                        result = vertipaq_analyzer(dataset=ds, workspace=ws, read_stats_from_data=read_stats_cb.value)
                 finally:
                     _ipd.display = _orig
                     if _idf and _orig2: _idf.display = _orig2
@@ -206,7 +207,7 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
     load_btn.on_click(on_load)
 
     nav_row = widgets.HBox(
-        [load_btn, model_dropdown, conn_status],
+        [load_btn, model_dropdown, read_stats_cb, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
     widget = widgets.VBox([nav_row, subtab_selector, df_container], layout=widgets.Layout(padding="12px", gap="4px"))
