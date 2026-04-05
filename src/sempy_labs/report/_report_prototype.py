@@ -93,6 +93,18 @@ def generate_report_prototype(
         _done_count = [0]
 
         def _export_one(idx, pg):
+            # Suppress all output inside each thread
+            import sys as _tsys
+            import io as _tio
+            _t_old_stdout = _tsys.stdout
+            _tsys.stdout = _tio.StringIO()
+            try:
+                import IPython.display as _tipd
+                _tipd_orig = _tipd.display
+                _tipd.display = lambda *a, **kw: None
+            except Exception:
+                _tipd = None
+                _tipd_orig = None
             try:
                 export_report(
                     report=report,
@@ -115,6 +127,9 @@ def generate_report_prototype(
                 with _lock:
                     export_errors.append(f"'{pg['display_name']}': {str(e)[:200]}")
             finally:
+                _tsys.stdout = _t_old_stdout
+                if _tipd and _tipd_orig:
+                    _tipd.display = _tipd_orig
                 with _lock:
                     _done_count[0] += 1
                     done = _done_count[0]
