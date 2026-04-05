@@ -448,27 +448,248 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
 
     refresh_btn.on_click(on_refresh)
 
-    # -- properties (bottom-right) --
+    # -- editable properties (bottom-right) --
     props_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Properties</div>'
     )
     props_html = widgets.HTML(
         value=f'<div style="padding:12px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY}; font-style:italic;">Select an object to view properties</div>',
     )
+
+    # Editable property inputs (for pages and visuals)
+    def _rprop(label_text, width="100%", disabled=False):
+        lbl = widgets.HTML(value=f'<span style="font-size:10px; font-weight:600; color:#555; font-family:{FONT_FAMILY};">{label_text}</span>')
+        inp = widgets.Text(layout=widgets.Layout(width=width, height="28px"), disabled=disabled)
+        row = widgets.VBox([lbl, inp], layout=widgets.Layout(gap="0px", margin="0"))
+        return inp, row
+
+    def _rprop_int(label_text, width="100%", disabled=False):
+        lbl = widgets.HTML(value=f'<span style="font-size:10px; font-weight:600; color:#555; font-family:{FONT_FAMILY};">{label_text}</span>')
+        inp = widgets.IntText(layout=widgets.Layout(width=width, height="28px"), disabled=disabled)
+        row = widgets.VBox([lbl, inp], layout=widgets.Layout(gap="0px", margin="0"))
+        return inp, row
+
+    def _rprop_bool(label_text):
+        cb = widgets.Checkbox(value=False, description=label_text, indent=False, layout=widgets.Layout(width="auto", height="28px"))
+        return cb
+
+    rp_display_name, rp_display_name_row = _rprop("Display Name")
+    rp_type, rp_type_row = _rprop("Type", disabled=True)
+    rp_width, rp_width_row = _rprop_int("Width")
+    rp_height, rp_height_row = _rprop_int("Height")
+    rp_x, rp_x_row = _rprop_int("X Position")
+    rp_y, rp_y_row = _rprop_int("Y Position")
+    rp_title, rp_title_row = _rprop("Title")
+    rp_hidden = _rprop_bool("Hidden")
+
+    _rp_pending = {}  # {key: {field: value, ...}}
+    _rp_suppressing = [False]
+    _rp_dirty = [False]
+
+    save_btn = widgets.Button(description="✓ No changes", button_style="success", disabled=True, layout=widgets.Layout(width="180px"))
+    discard_btn = widgets.Button(description="✘ Discard", button_style="warning", layout=widgets.Layout(width="90px", display="none"))
+    save_status = status_html()
+    save_row = widgets.HBox([save_btn, discard_btn, save_status], layout=widgets.Layout(align_items="center", gap="6px", margin="4px 0 0 0"))
+
+    # Page-specific props container
+    page_props = widgets.VBox([rp_display_name_row, rp_type_row, rp_width_row, rp_height_row, rp_hidden], layout=widgets.Layout(gap="2px", display="none"))
+    # Visual-specific props container
+    visual_props = widgets.VBox([rp_type_row, rp_title_row, rp_x_row, rp_y_row, rp_width_row, rp_height_row, rp_hidden], layout=widgets.Layout(gap="2px", display="none"))
+
+    def _rp_mark_dirty(*_):
+        if _rp_suppressing[0]:
+            return
+        _rp_dirty[0] = True
+        # Capture current values
+        key = _current_key[0]
+        if key:
+            node_type = key.split(":")[0]
+            if node_type == "page":
+                _rp_pending[key] = {
+                    "display_name": rp_display_name.value,
+                    "width": rp_width.value,
+                    "height": rp_height.value,
+                    "hidden": rp_hidden.value,
+                }
+            elif node_type == "visual":
+                _rp_pending[key] = {
+                    "title": rp_title.value,
+                    "x": rp_x.value,
+                    "y": rp_y.value,
+                    "width": rp_width.value,
+                    "height": rp_height.value,
+                    "hidden": rp_hidden.value,
+                }
+        n = len(_rp_pending)
+        save_btn.description = f"⚠️ {n} unsaved change(s)"
+        save_btn.button_style = "danger"
+        save_btn.disabled = False
+        discard_btn.layout.display = ""
+
+    def _rp_mark_clean():
+        _rp_dirty[0] = False
+        _rp_pending.clear()
+        save_btn.description = "✓ No changes"
+        save_btn.button_style = "success"
+        save_btn.disabled = True
+        discard_btn.layout.display = "none"
+        save_status.value = ""
+
+    for w in [rp_display_name, rp_width, rp_height, rp_title, rp_x, rp_y]:
+        w.observe(_rp_mark_dirty, names="value")
+    rp_hidden.observe(_rp_mark_dirty, names="value")
+
+    def _populate_report_props(key):
+        """Fill editable property widgets from report data."""
+        _rp_suppressing[0] = True
+        node_type = key.split(":")[0]
+        page_props.layout.display = "none"
+        visual_props.layout.display = "none"
+
+        if node_type == "page":
+            p_name = key.split(":", 1)[1]
+            if "\x1f" in p_name:
+                _, p_name = p_name.split("\x1f", 1)
+            pages = _report_data.get("pages", {})
+            if not pages and _report_data.get("reports"):
+                for rd in _report_data["reports"].values():
+                    pages.update(rd.get("pages", {}))
+            p = pages.get(p_name, {})
+            rp_display_name.value = p.get("display_name", p_name)
+            rp_type.value = "Page"
+            rp_width.value = int(p.get("width", 1280))
+            rp_height.value = int(p.get("height", 720))
+            rp_hidden.value = bool(p.get("hidden", False))
+            page_props.layout.display = ""
+
+        elif node_type == "visual":
+            v_raw = key.split(":", 1)[1]
+            v_parts = v_raw.rsplit("\x1f", 1)
+            p_key = v_parts[0] if len(v_parts) > 1 else ""
+            v_name = v_parts[-1]
+            pages = _report_data.get("pages", {})
+            if not pages and _report_data.get("reports"):
+                for rd in _report_data["reports"].values():
+                    pages.update(rd.get("pages", {}))
+            v = {}
+            for p_data in pages.values():
+                if v_name in p_data.get("visuals", {}):
+                    v = p_data["visuals"][v_name]
+                    break
+            rp_type.value = v.get("type", "")
+            rp_title.value = v.get("title", "")
+            rp_x.value = int(v.get("x", 0))
+            rp_y.value = int(v.get("y", 0))
+            rp_width.value = int(v.get("width", 0))
+            rp_height.value = int(v.get("height", 0))
+            rp_hidden.value = bool(v.get("hidden", False))
+            visual_props.layout.display = ""
+
+        _rp_suppressing[0] = False
+
+    def on_rp_save(_):
+        if not _rp_pending:
+            return
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        rpt_input = report_input.value.strip() if report_input else ""
+        rpt = rpt_input.split(",")[0].strip()
+        for pfx in ("\U0001F4C4 ", "\U0001F4CA "):
+            if rpt.startswith(pfx):
+                rpt = rpt[len(pfx):]
+        if not rpt:
+            set_status(save_status, "No report loaded.", "#ff3b30")
+            return
+        save_btn.disabled = True
+        save_btn.description = "Saving…"
+        set_status(save_status, f"Writing {len(_rp_pending)} change(s) via connect_report…", GRAY_COLOR)
+
+        def _save_bg():
+            try:
+                from sempy_labs.report import connect_report
+                import sys, io as _sio
+                _old = sys.stdout; sys.stdout = _sio.StringIO()
+                try:
+                    with connect_report(report=rpt, readonly=False, workspace=ws) as rw:
+                        for key, changes in _rp_pending.items():
+                            node_type = key.split(":")[0]
+                            if node_type == "page":
+                                p_name = key.split(":", 1)[1]
+                                if "\x1f" in p_name:
+                                    _, p_name = p_name.split("\x1f", 1)
+                                pages_df = rw.list_pages()
+                                for _, row in pages_df.iterrows():
+                                    if str(row.get("Page Name", "")) == p_name or str(row.get("Page Display Name", "")) == p_name:
+                                        page_name = str(row.get("Page Name", ""))
+                                        if "display_name" in changes:
+                                            rw.set_page_property(page_name=page_name, property_name="displayName", property_value=changes["display_name"])
+                                        if "width" in changes:
+                                            rw.set_page_property(page_name=page_name, property_name="width", property_value=changes["width"])
+                                        if "height" in changes:
+                                            rw.set_page_property(page_name=page_name, property_name="height", property_value=changes["height"])
+                                        if "hidden" in changes:
+                                            rw.set_page_property(page_name=page_name, property_name="visibility", property_value=1 if changes["hidden"] else 0)
+                                        break
+                            elif node_type == "visual":
+                                v_raw = key.split(":", 1)[1]
+                                v_parts = v_raw.rsplit("\x1f", 1)
+                                v_name = v_parts[-1]
+                                # Find page for this visual
+                                p_name = None
+                                pages_df = rw.list_pages()
+                                visuals_df = rw.list_visuals()
+                                for _, vr in visuals_df.iterrows():
+                                    if str(vr.get("Visual Name", "")) == v_name:
+                                        p_name = str(vr.get("Page Name", ""))
+                                        break
+                                if p_name and v_name:
+                                    if "x" in changes:
+                                        rw.set_visual_property(page_name=p_name, visual_name=v_name, property_name="x", property_value=changes["x"])
+                                    if "y" in changes:
+                                        rw.set_visual_property(page_name=p_name, visual_name=v_name, property_name="y", property_value=changes["y"])
+                                    if "width" in changes:
+                                        rw.set_visual_property(page_name=p_name, visual_name=v_name, property_name="width", property_value=changes["width"])
+                                    if "height" in changes:
+                                        rw.set_visual_property(page_name=p_name, visual_name=v_name, property_name="height", property_value=changes["height"])
+                finally:
+                    sys.stdout = _old
+                _rp_mark_clean()
+                set_status(save_status, f"✓ Saved {len(_rp_pending)} change(s).", "#34c759")
+            except Exception as e:
+                set_status(save_status, f"Error: {str(e)[:200]}", "#ff3b30")
+            finally:
+                save_btn.disabled = False
+                if _rp_dirty[0]:
+                    n = len(_rp_pending)
+                    save_btn.description = f"⚠️ {n} unsaved change(s)"
+                    save_btn.button_style = "danger"
+                else:
+                    save_btn.description = "✓ No changes"
+                    save_btn.button_style = "success"
+
+        import threading
+        threading.Thread(target=_save_bg, daemon=True).start()
+
+    def on_rp_discard(_):
+        _rp_mark_clean()
+        key = _current_key[0]
+        if key:
+            _populate_report_props(key)
+
+    save_btn.on_click(on_rp_save)
+    discard_btn.on_click(on_rp_discard)
     # Violations panel (shown below properties when scan results exist)
     violations_box = widgets.VBox(layout=widgets.Layout(display="none", gap="4px"))
     # Navigation panel for visual → SM object linking
     nav_objects_box = widgets.VBox(layout=widgets.Layout(display="none", gap="4px"))
     props_box = widgets.VBox(
-        [props_label, props_html, violations_box, nav_objects_box],
+        [props_label, props_html, page_props, visual_props, save_row, violations_box, nav_objects_box],
         layout=widgets.Layout(
-            flex="0 0 220px",
+            flex="0 0 240px",
             min_height="450px",
-            max_height="450px",
-            overflow_y="auto",
             border=f"1px solid {BORDER_COLOR}",
             border_radius="8px",
-            padding="8px",
+            padding="6px",
             background_color=SECTION_BG,
         ),
     )
@@ -666,6 +887,7 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
                 _refresh_tree()
         # Update properties + preview navigation
         props_html.value = _get_properties_html(_report_data, key)
+        _populate_report_props(key)
 
         # Show violation details with Fix buttons if scan results exist
         details = _scan_details.get(key, [])
