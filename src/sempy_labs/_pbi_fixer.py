@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.145"
+__version__ = "1.2.146"
 
 import ipywidgets as widgets
 import io
@@ -1404,6 +1404,168 @@ def _prototype_tab(workspace_input=None, report_input=None):
     return widget
 
 
+# ---------------------------------------------------------------------------
+# Model Diagram tab (inline)
+# ---------------------------------------------------------------------------
+def _diagram_tab(workspace_input=None, report_input=None):
+    """Build the Model Diagram tab — SVG visualization of table relationships."""
+    from sempy_labs._ui_components import (
+        FONT_FAMILY, BORDER_COLOR, GRAY_COLOR, ICON_ACCENT, SECTION_BG,
+        status_html, set_status,
+    )
+
+    generate_btn = widgets.Button(description="\U0001F5FA Generate Diagram", button_style="primary", layout=widgets.Layout(width="200px"))
+    model_dd = widgets.Dropdown(options=["(load a model first)"], value="(load a model first)", layout=widgets.Layout(width="300px"))
+    conn_status = status_html()
+
+    nav_row = widgets.HBox(
+        [generate_btn, model_dd, conn_status],
+        layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
+    )
+
+    svg_display = widgets.HTML(
+        value=f'<div style="padding:20px; color:{GRAY_COLOR}; font-size:14px; font-family:{FONT_FAMILY}; text-align:center; font-style:italic;">Click "Generate Diagram" after loading a model in the Model Explorer tab.</div>'
+    )
+    svg_container = widgets.VBox(
+        [svg_display],
+        layout=widgets.Layout(
+            overflow_x="auto", overflow_y="auto", max_height="600px",
+            border=f"1px solid {BORDER_COLOR}", border_radius="8px",
+            padding="8px", background_color="#fff",
+        ),
+    )
+
+    # Layout constants
+    _BOX_W = 200
+    _BOX_H = 80
+    _PAD_X = 80
+    _PAD_Y = 100
+    _COLS = 5
+
+    def _generate(_):
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        ds_input = report_input.value.strip() if report_input else ""
+        if not ds_input:
+            set_status(conn_status, "Enter a model name.", "#ff3b30")
+            return
+        ds = ds_input.split(",")[0].strip()
+        for pfx in ("\U0001F4C4 ", "\U0001F4CA "):
+            if ds.startswith(pfx):
+                ds = ds[len(pfx):]
+
+        generate_btn.disabled = True
+        generate_btn.description = "Loading\u2026"
+        set_status(conn_status, f"Loading relationships for '{ds}'\u2026", GRAY_COLOR)
+
+        try:
+            from sempy_labs.tom import connect_semantic_model
+            tables = {}
+            relationships = []
+
+            with connect_semantic_model(dataset=ds, readonly=True, workspace=ws) as tom:
+                for table in tom.model.Tables:
+                    cols = []
+                    for col in table.Columns:
+                        if col.IsKey:
+                            cols.append(f"\U0001F511 {col.Name}")
+                        elif any(r.FromColumn.Name == col.Name and str(r.FromTable.Name) == table.Name for r in tom.model.Relationships):
+                            cols.append(f"\U0001F517 {col.Name}")
+                    tables[table.Name] = {
+                        "name": table.Name,
+                        "cols": cols[:5],  # limit to 5 key/FK cols
+                        "is_hidden": bool(table.IsHidden),
+                        "rel_count": 0,
+                    }
+
+                for rel in tom.model.Relationships:
+                    from_t = str(rel.FromTable.Name)
+                    from_c = str(rel.FromColumn.Name)
+                    to_t = str(rel.ToTable.Name)
+                    to_c = str(rel.ToColumn.Name)
+                    card_from = str(rel.FromCardinality) if hasattr(rel, "FromCardinality") else "*"
+                    card_to = str(rel.ToCardinality) if hasattr(rel, "ToCardinality") else "1"
+                    is_active = bool(rel.IsActive) if hasattr(rel, "IsActive") else True
+                    cross = str(rel.CrossFilteringBehavior) if hasattr(rel, "CrossFilteringBehavior") else ""
+                    relationships.append({
+                        "from_table": from_t, "from_col": from_c,
+                        "to_table": to_t, "to_col": to_c,
+                        "cardinality": f"{card_from}:{card_to}",
+                        "active": is_active, "cross_filter": cross,
+                    })
+                    if from_t in tables:
+                        tables[from_t]["rel_count"] += 1
+                    if to_t in tables:
+                        tables[to_t]["rel_count"] += 1
+
+            # Layout: sort by relationship count (fact tables first), then alphabetical
+            sorted_tables = sorted(tables.values(), key=lambda t: (-t["rel_count"], t["name"]))
+            visible_tables = [t for t in sorted_tables if not t["is_hidden"]]
+
+            # Build positions
+            positions = {}
+            for idx, t in enumerate(visible_tables):
+                col = idx % _COLS
+                row = idx // _COLS
+                positions[t["name"]] = (40 + col * (_BOX_W + _PAD_X), 40 + row * (_BOX_H + _PAD_Y))
+
+            # Build SVG
+            n = len(visible_tables)
+            cols = min(_COLS, n) if n > 0 else 1
+            rows_count = (n + cols - 1) // cols
+            svg_w = cols * (_BOX_W + _PAD_X) + 40
+            svg_h = rows_count * (_BOX_H + _PAD_Y) + 40
+
+            svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}" viewBox="0 0 {svg_w} {svg_h}">']
+            svg.append(f'<rect width="{svg_w}" height="{svg_h}" fill="#fff"/>')
+            svg.append('<defs><marker id="rel-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#888"/></marker></defs>')
+
+            # Draw relationship lines first (behind boxes)
+            for rel in relationships:
+                if rel["from_table"] not in positions or rel["to_table"] not in positions:
+                    continue
+                fx, fy = positions[rel["from_table"]]
+                tx, ty = positions[rel["to_table"]]
+                x1, y1 = fx + _BOX_W // 2, fy + _BOX_H
+                x2, y2 = tx + _BOX_W // 2, ty
+                color = "#888" if rel["active"] else "#ddd"
+                dash = "" if rel["active"] else ' stroke-dasharray="4,3"'
+                svg.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="1.5"{dash} marker-end="url(#rel-arrow)"/>')
+                # Cardinality label at midpoint
+                mx, my = (x1 + x2) // 2, (y1 + y2) // 2
+                svg.append(f'<text x="{mx}" y="{my - 4}" font-family="{FONT_FAMILY}" font-size="9" fill="#888" text-anchor="middle">{rel["cardinality"]}</text>')
+
+            # Draw table boxes
+            for t in visible_tables:
+                x, y = positions[t["name"]]
+                # Header
+                svg.append(f'<rect x="{x}" y="{y}" width="{_BOX_W}" height="24" rx="4" fill="#2563eb" stroke="#1e40af" stroke-width="1"/>')
+                svg.append(f'<text x="{x + 8}" y="{y + 16}" font-family="{FONT_FAMILY}" font-size="12" font-weight="600" fill="#fff">{t["name"][:22]}</text>')
+                # Body
+                body_h = max(20, len(t["cols"]) * 14 + 6)
+                svg.append(f'<rect x="{x}" y="{y + 24}" width="{_BOX_W}" height="{body_h}" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>')
+                for ci, col_name in enumerate(t["cols"]):
+                    svg.append(f'<text x="{x + 8}" y="{y + 38 + ci * 14}" font-family="{FONT_FAMILY}" font-size="10" fill="#555">{col_name[:25]}</text>')
+                if not t["cols"]:
+                    svg.append(f'<text x="{x + 8}" y="{y + 38}" font-family="{FONT_FAMILY}" font-size="10" fill="#bbb" font-style="italic">(no key/FK cols)</text>')
+
+            svg.append('</svg>')
+            svg_display.value = "\n".join(svg)
+
+            set_status(conn_status, f"\u2713 Diagram: {len(visible_tables)} tables, {len(relationships)} relationships.", "#34c759")
+
+        except Exception as e:
+            set_status(conn_status, f"Error: {str(e)[:100]}", "#ff3b30")
+        finally:
+            generate_btn.disabled = False
+            generate_btn.description = "\U0001F5FA Generate Diagram"
+
+    generate_btn.on_click(_generate)
+
+    widget = widgets.VBox([nav_row, svg_container], layout=widgets.Layout(padding="12px", gap="4px"))
+    return widget
+
+
 def pbi_fixer(
     workspace: Optional[str | UUID] = None,
     report: Optional[str | UUID] = None,
@@ -1948,6 +2110,7 @@ def pbi_fixer(
     _tab_options.append("\U0001F4C4 Report BPA")
     _tab_options.append("\U0001F4D0 Delta Analyzer")
     _tab_options.append("\U0001F4D0 Prototype")
+    _tab_options.append("\U0001F5FA Model Diagram")
     _tab_options.append("\u2139\ufe0f About")
     if not _tab_options:
         _tab_options = ["\u26A1 Fixer"]
@@ -2682,6 +2845,12 @@ def pbi_fixer(
         workspace_input=workspace_input, report_input=report_input
     )
     tab_panels.append(proto_content)
+
+    # Model Diagram tab
+    diagram_content = _diagram_tab(
+        workspace_input=workspace_input, report_input=report_input
+    )
+    tab_panels.append(diagram_content)
 
     # About tab
     about_content = widgets.HTML(
