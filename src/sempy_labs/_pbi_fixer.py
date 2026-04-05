@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.148"
+__version__ = "1.2.149"
 
 import ipywidgets as widgets
 import io
@@ -2178,7 +2178,7 @@ def pbi_fixer(
             _clone_rpt(report=rpt, cloned_report=cloned, workspace=ws)
             download_status.value = f'<span style="color:#34c759; font-size:12px;">\u2713 Report cloned as \'{cloned}\'.</span>'
         except Exception as e:
-            download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:80]}</span>'
+            download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:200]}</span>'
         clone_rpt_btn.disabled = False
 
     def _on_clone_model(_):
@@ -2191,10 +2191,10 @@ def pbi_fixer(
         clone_model_btn.disabled = True
         download_status.value = f'<span style="color:#999; font-size:12px;">Cloning model\u2026</span>'
         try:
-            _clone_semantic_model_impl(ds, ws)
-            download_status.value = f'<span style="color:#34c759; font-size:12px;">\u2713 Model cloned as \'{ds}_copy\'.</span>'
+            cloned_name = _clone_semantic_model_impl(ds, ws)
+            download_status.value = f'<span style="color:#34c759; font-size:12px;">\u2713 Model cloned as \'{cloned_name}\'.</span>'
         except Exception as e:
-            download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:80]}</span>'
+            download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:200]}</span>'
         clone_model_btn.disabled = False
 
     def _clone_semantic_model_impl(ds, ws):
@@ -2221,8 +2221,23 @@ def pbi_fixer(
                 break
         if bim_part is None:
             raise ValueError(f"Could not extract model.bim. Got {len(result.get('definition', {}).get('parts', []))} part(s): {[p.get('path') for p in result.get('definition', {}).get('parts', [])]}")
-        create_semantic_model_from_bim(dataset=f"{ds}_copy", bim_file=bim_part, workspace=ws)
-        create_semantic_model_from_bim(dataset=f"{ds}_copy", bim_file=bim_part, workspace=ws)
+
+        # Find unique name (append _copy, _copy2, _copy3, etc.)
+        import sempy.fabric as fabric
+        existing = set()
+        try:
+            df = fabric.list_datasets(workspace=ws, mode="rest")
+            existing = set(df["Dataset Name"].tolist())
+        except Exception:
+            pass
+        cloned_name = f"{ds}_copy"
+        counter = 2
+        while cloned_name in existing:
+            cloned_name = f"{ds}_copy{counter}"
+            counter += 1
+
+        create_semantic_model_from_bim(dataset=cloned_name, bim_file=bim_part, workspace=ws)
+        return cloned_name
 
     def _on_clone_both(_):
         rpt = _strip_item_prefix(report_input.value.strip())
@@ -2250,17 +2265,17 @@ def pbi_fixer(
         try:
             # 1. Clone model
             download_status.value = f'<span style="color:#999; font-size:12px;">Cloning model \'{ds}\'\u2026</span>'
-            _clone_semantic_model_impl(ds, ws)
+            cloned_ds = _clone_semantic_model_impl(ds, ws)
             # 2. Clone report, rebound to new model
             download_status.value = f'<span style="color:#999; font-size:12px;">Cloning report \'{rpt}\'\u2026</span>'
             from sempy_labs.report._report_functions import clone_report as _clone_rpt
-            _clone_rpt(report=rpt, cloned_report=f"{rpt}_copy", workspace=ws, target_dataset=f"{ds}_copy")
+            _clone_rpt(report=rpt, cloned_report=f"{rpt}_copy", workspace=ws, target_dataset=cloned_ds)
             download_status.value = (
                 f'<span style="color:#34c759; font-size:12px;">'
-                f'\u2713 Cloned \'{rpt}_copy\' + \'{ds}_copy\'.</span>'
+                f'\u2713 Cloned \'{rpt}_copy\' + \'{cloned_ds}\'.</span>'
             )
         except Exception as e:
-            download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:80]}</span>'
+            download_status.value = f'<span style="color:#ff3b30; font-size:12px;">Error: {str(e)[:200]}</span>'
         clone_both_btn.disabled = False
 
     clone_both_btn.on_click(_on_clone_both)
