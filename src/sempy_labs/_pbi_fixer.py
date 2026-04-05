@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.166"
+__version__ = "1.2.167"
 
 import ipywidgets as widgets
 import io
@@ -1737,29 +1737,29 @@ def _prototype_tab(workspace_input=None, report_input=None):
             try:
                 set_status(conn_status, "Generating prototype\u2026", GRAY_COLOR)
 
-            # Use standalone module
-            from sempy_labs.report._report_prototype import generate_report_prototype
-            result = generate_report_prototype(
-                report=rpt,
-                workspace=ws,
-                screenshots=screenshots_val,
-                include_hidden=hidden_val,
-                on_progress=_proto_progress,
-            )
+                # Use standalone module
+                from sempy_labs.report._report_prototype import generate_report_prototype
+                result = generate_report_prototype(
+                    report=rpt,
+                    workspace=ws,
+                    screenshots=screenshots_val,
+                    include_hidden=hidden_val,
+                    on_progress=_proto_progress,
+                )
 
-            svg = result["svg"]
-            excalidraw = result["excalidraw"]
-            total = len(result["pages"])
-            n_screenshots = result["screenshots"]
-            export_errors = result["errors"]
+                svg = result["svg"]
+                excalidraw = result["excalidraw"]
+                total = len(result["pages"])
+                n_screenshots = result["screenshots"]
+                export_errors = result["errors"]
 
-            _svg_cache[0] = svg
-            _excalidraw_cache[0] = excalidraw
-            svg_display.value = svg
-            export_excalidraw_btn.layout.display = ""
-            export_svg_btn.layout.display = ""
-            err_msg = f" Export errors: {'; '.join(export_errors[:2])}" if export_errors else ""
-            set_status(conn_status, f"\u2713 Prototype: {total} pages, {n_screenshots} screenshots.{err_msg}", "#34c759" if not export_errors else "#ff9500")
+                _svg_cache[0] = svg
+                _excalidraw_cache[0] = excalidraw
+                svg_display.value = svg
+                export_excalidraw_btn.layout.display = ""
+                export_svg_btn.layout.display = ""
+                err_msg = f" Export errors: {'; '.join(export_errors[:2])}" if export_errors else ""
+                set_status(conn_status, f"\u2713 Prototype: {total} pages, {n_screenshots} screenshots.{err_msg}", "#34c759" if not export_errors else "#ff9500")
 
             except Exception as e:
                 set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
