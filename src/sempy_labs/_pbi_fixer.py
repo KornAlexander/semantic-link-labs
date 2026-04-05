@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.149"
+__version__ = "1.2.150"
 
 import ipywidgets as widgets
 import io
@@ -1359,7 +1359,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
             set_status(conn_status, f"\u2713 Prototype: {total} pages, {n_screenshots} screenshots.{err_msg}", "#34c759" if not export_errors else "#ff9500")
 
         except Exception as e:
-            set_status(conn_status, f"Error: {str(e)[:100]}", "#ff3b30")
+            set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
         finally:
             generate_btn.disabled = False
             generate_btn.description = "\U0001F4D0 Generate Prototype"
@@ -1555,7 +1555,7 @@ def _diagram_tab(workspace_input=None, report_input=None):
             set_status(conn_status, f"\u2713 Diagram: {len(visible_tables)} tables, {len(relationships)} relationships.", "#34c759")
 
         except Exception as e:
-            set_status(conn_status, f"Error: {str(e)[:100]}", "#ff3b30")
+            set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
         finally:
             generate_btn.disabled = False
             generate_btn.description = "\U0001F5FA Generate Diagram"
