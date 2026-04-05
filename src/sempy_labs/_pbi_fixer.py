@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.170"
+__version__ = "1.2.171"
 
 import ipywidgets as widgets
 import io
@@ -459,10 +459,19 @@ def _translations_tab(workspace_input=None, report_input=None):
             from pyspark.sql.functions import flatten, col
             from sempy_labs._helper_functions import _create_spark_session
 
+            set_status(conn_status, "Initializing Spark session…", GRAY_COLOR)
             spark = _create_spark_session()
             total = 0
+            lang_count = len(_languages)
+            translated_langs = 0
 
-            for lang in _languages:
+            for lang_idx, lang in enumerate(_languages):
+                # Convert locale (de-DE → de)
+                target_lang = lang.split("-")[0].lower()
+                if target_lang == "en":
+                    translated_langs += 1
+                    continue
+
                 # Collect untranslated object names for this language
                 to_translate = []
                 keys_to_update = []
@@ -473,14 +482,11 @@ def _translations_tab(workspace_input=None, report_input=None):
                         keys_to_update.append(key)
 
                 if not to_translate:
+                    translated_langs += 1
                     continue
 
-                # Convert locale (de-DE → de)
-                target_lang = lang.split("-")[0].lower()
-                if target_lang == "en":
-                    continue
-
-                set_status(conn_status, f"Translating {len(to_translate)} names → {lang} (Azure AI Translator)…", GRAY_COLOR)
+                set_status(conn_status, f"Language {lang_idx+1}/{lang_count}: Translating {len(to_translate)} names → {lang}…", GRAY_COLOR)
+                auto_translate_btn.description = f"{lang} ({lang_idx+1}/{lang_count})"
 
                 # Build Spark DataFrame with names
                 schema = StructType([StructField("text", StringType(), True)])
@@ -503,15 +509,20 @@ def _translations_tab(workspace_input=None, report_input=None):
 
                 # Extract results
                 results = df_result.collect()
+                lang_translated = 0
                 for row, key in zip(results, keys_to_update):
                     translated_list = row["translation"]
                     if translated_list and len(translated_list) > 0:
                         _trans_data[key][lang] = str(translated_list[0])
                         total += 1
+                        lang_translated += 1
 
-            _render_grid()
+                translated_langs += 1
+                set_status(conn_status, f"✓ {lang}: {lang_translated} translated ({translated_langs}/{lang_count} languages done)", "#34c759")
+                _render_grid()
+
             _render_preview()
-            set_status(conn_status, f"✓ Auto-translated {total} names across {len(_languages)} language(s) via Azure AI Translator.", "#34c759")
+            set_status(conn_status, f"✓ Auto-translated {total} names across {translated_langs} language(s) via Azure AI Translator.", "#34c759")
         except ImportError:
             set_status(conn_status, "SynapseML not available. Run in a Fabric Notebook.", "#ff3b30")
         except Exception as e:
