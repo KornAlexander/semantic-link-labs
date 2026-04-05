@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.161"
+__version__ = "1.2.162"
 
 import ipywidgets as widgets
 import io
@@ -218,6 +218,383 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
     widget = widgets.VBox([nav_row, subtab_selector, df_container], layout=widgets.Layout(padding="12px", gap="4px"))
+    return widget
+
+
+# ---------------------------------------------------------------------------
+# Translations Editor tab (inline)
+# ---------------------------------------------------------------------------
+def _translations_tab(workspace_input=None, report_input=None):
+    """Build the Translations Editor tab — view, auto-translate, edit, and apply translations."""
+    from sempy_labs._ui_components import (
+        FONT_FAMILY, BORDER_COLOR, GRAY_COLOR, ICON_ACCENT, SECTION_BG,
+        status_html, set_status,
+    )
+
+    _trans_data = {}  # {obj_key: {lang: value, ...}}
+    _original = {}    # snapshot of original translations for diff
+    _objects = []     # [(obj_type, table_name, obj_name, tom_path), ...]
+    _languages = []   # ["de-DE", "fr-FR", ...]
+    _ds_name = [None]
+
+    # Common language codes
+    _LANG_OPTIONS = [
+        "de-DE", "fr-FR", "es-ES", "it-IT", "pt-BR", "nl-NL", "pl-PL",
+        "ja-JP", "zh-CN", "ko-KR", "ru-RU", "tr-TR", "ar-SA", "sv-SE",
+        "da-DK", "nb-NO", "fi-FI", "cs-CZ", "hu-HU", "ro-RO",
+    ]
+
+    load_btn = widgets.Button(description="Load Translations", button_style="primary", layout=widgets.Layout(width="150px"))
+    lang_dropdown = widgets.Dropdown(options=_LANG_OPTIONS, value="de-DE", layout=widgets.Layout(width="100px"))
+    add_lang_btn = widgets.Button(description="+ Add Language", layout=widgets.Layout(width="120px"))
+    auto_translate_btn = widgets.Button(description="🌐 Auto-Translate", button_style="info", layout=widgets.Layout(width="150px"))
+    apply_btn = widgets.Button(description="✓ Apply Changes", button_style="success", layout=widgets.Layout(width="140px"), disabled=True)
+    conn_status = status_html()
+
+    nav_row = widgets.HBox(
+        [load_btn, lang_dropdown, add_lang_btn, auto_translate_btn, apply_btn, conn_status],
+        layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0", flex_wrap="wrap"),
+    )
+
+    # Grid container — holds the translations table as HTML + editable widgets
+    grid_html = widgets.HTML(
+        value=f'<div style="padding:20px; color:{GRAY_COLOR}; font-size:14px; font-family:{FONT_FAMILY}; text-align:center; font-style:italic;">Click Load Translations to view/edit model translations.</div>',
+    )
+    grid_container = widgets.VBox(
+        [grid_html],
+        layout=widgets.Layout(
+            max_height="500px", overflow_y="auto", overflow_x="auto",
+            border=f"1px solid {BORDER_COLOR}", border_radius="8px",
+            padding="8px", background_color=SECTION_BG,
+        ),
+    )
+
+    # Preview of pending changes
+    preview_html = widgets.HTML(value="")
+    preview_container = widgets.VBox(
+        [preview_html],
+        layout=widgets.Layout(
+            max_height="200px", overflow_y="auto",
+            border=f"1px solid {BORDER_COLOR}", border_radius="8px",
+            padding="8px", background_color=SECTION_BG,
+            display="none",
+        ),
+    )
+
+    def _obj_key(obj_type, table_name, obj_name):
+        return f"{obj_type}:{table_name}:{obj_name}"
+
+    def _render_grid():
+        """Render translations as an HTML table."""
+        if not _objects:
+            grid_html.value = f'<div style="color:{GRAY_COLOR};">No objects loaded.</div>'
+            return
+        langs = _languages
+        html = '<table style="border-collapse:collapse; width:100%; font-size:11px; font-family:monospace;">'
+        html += '<tr style="background:#f5f5f5; position:sticky; top:0; z-index:1;">'
+        html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Type</th>'
+        html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Table</th>'
+        html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Object</th>'
+        html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Original Name</th>'
+        for lang in langs:
+            html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR}; color:{ICON_ACCENT};">{lang}</th>'
+        html += '</tr>'
+
+        for obj_type, table_name, obj_name, _ in _objects:
+            key = _obj_key(obj_type, table_name, obj_name)
+            trans = _trans_data.get(key, {})
+            orig = _original.get(key, {})
+            html += '<tr>'
+            type_icon = "📊" if obj_type == "Table" else "🔢" if obj_type == "Column" else "Σ" if obj_type == "Measure" else "📁"
+            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#888;">{type_icon} {obj_type}</td>'
+            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0;">{table_name}</td>'
+            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; font-weight:600;">{obj_name}</td>'
+            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#555;">{obj_name}</td>'
+            for lang in langs:
+                val = trans.get(lang, "")
+                orig_val = orig.get(lang, "")
+                is_changed = val != orig_val
+                bg = "#fff3cd" if is_changed else ""
+                style = f'background:{bg};' if bg else ""
+                html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; {style}">{val or "<span style=&quot;color:#ccc;&quot;>—</span>"}</td>'
+            html += '</tr>'
+        html += '</table>'
+        grid_html.value = html
+
+    def _render_preview():
+        """Show pending changes as a diff."""
+        changes = []
+        for obj_type, table_name, obj_name, _ in _objects:
+            key = _obj_key(obj_type, table_name, obj_name)
+            trans = _trans_data.get(key, {})
+            orig = _original.get(key, {})
+            for lang in _languages:
+                new_val = trans.get(lang, "")
+                old_val = orig.get(lang, "")
+                if new_val != old_val:
+                    changes.append((obj_type, table_name, obj_name, lang, old_val, new_val))
+
+        if not changes:
+            preview_container.layout.display = "none"
+            apply_btn.disabled = True
+            return
+
+        preview_container.layout.display = ""
+        apply_btn.disabled = False
+        html = f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; margin-bottom:4px;">PENDING CHANGES ({len(changes)})</div>'
+        html += '<table style="border-collapse:collapse; width:100%; font-size:11px;">'
+        html += '<tr style="background:#f5f5f5;"><th style="padding:3px 6px;">Object</th><th style="padding:3px 6px;">Language</th><th style="padding:3px 6px;">Old</th><th style="padding:3px 6px;">New</th></tr>'
+        for obj_type, table_name, obj_name, lang, old_val, new_val in changes:
+            old_display = old_val or "—"
+            html += f'<tr><td style="padding:3px 6px; border-bottom:1px solid #f0f0f0;">{table_name}.{obj_name}</td>'
+            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; color:{ICON_ACCENT};">{lang}</td>'
+            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#888; text-decoration:line-through;">{old_display}</td>'
+            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#34c759; font-weight:600;">{new_val}</td></tr>'
+        html += '</table>'
+        preview_html.value = html
+
+    def on_load(_):
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        ds_input = report_input.value.strip() if report_input else ""
+        if not ds_input:
+            set_status(conn_status, "Enter a semantic model name.", "#ff3b30")
+            return
+        ds = ds_input.split(",")[0].strip()
+        # Strip icon prefix
+        for pfx in ("\U0001F4C4 ", "\U0001F4CA "):
+            if ds.startswith(pfx):
+                ds = ds[len(pfx):]
+        load_btn.disabled = True
+        load_btn.description = "Loading…"
+        _ds_name[0] = ds
+
+        def _load_bg():
+            try:
+                set_status(conn_status, f"Loading translations for '{ds}'…", GRAY_COLOR)
+                from sempy_labs.tom import connect_semantic_model
+                import Microsoft.AnalysisServices.Tabular as TOM
+
+                _objects.clear()
+                _trans_data.clear()
+                _original.clear()
+                _languages.clear()
+
+                with connect_semantic_model(dataset=ds, readonly=True, workspace=ws) as tom:
+                    # Collect languages
+                    for c in tom.model.Cultures:
+                        _languages.append(str(c.Name))
+
+                    # Collect objects
+                    for table in tom.model.Tables:
+                        t_name = str(table.Name)
+                        _objects.append(("Table", t_name, t_name, ("table", t_name)))
+                        for col in table.Columns:
+                            if col.Type == TOM.ColumnType.RowNumber:
+                                continue
+                            _objects.append(("Column", t_name, str(col.Name), ("column", t_name, str(col.Name))))
+                        for m in table.Measures:
+                            _objects.append(("Measure", t_name, str(m.Name), ("measure", t_name, str(m.Name))))
+                        for h in table.Hierarchies:
+                            _objects.append(("Hierarchy", t_name, str(h.Name), ("hierarchy", t_name, str(h.Name))))
+
+                    # Collect existing translations
+                    for obj_type, table_name, obj_name, tom_path in _objects:
+                        key = _obj_key(obj_type, table_name, obj_name)
+                        _trans_data[key] = {}
+                        for lang in _languages:
+                            try:
+                                culture = tom.model.Cultures[lang]
+                                if tom_path[0] == "table":
+                                    obj = tom.model.Tables[table_name]
+                                elif tom_path[0] == "column":
+                                    obj = tom.model.Tables[table_name].Columns[obj_name]
+                                elif tom_path[0] == "measure":
+                                    obj = tom.model.Tables[table_name].Measures[obj_name]
+                                elif tom_path[0] == "hierarchy":
+                                    obj = tom.model.Tables[table_name].Hierarchies[obj_name]
+                                else:
+                                    continue
+                                t = culture.ObjectTranslations[obj, TOM.TranslatedProperty.Caption]
+                                _trans_data[key][lang] = str(t.Value) if t and t.Value else ""
+                            except Exception:
+                                _trans_data[key][lang] = ""
+
+                # Snapshot original for diff
+                import copy
+                _original.update(copy.deepcopy(_trans_data))
+
+                _render_grid()
+                n_obj = len(_objects)
+                n_lang = len(_languages)
+                n_existing = sum(1 for key in _trans_data for lang in _trans_data[key] if _trans_data[key][lang])
+                set_status(conn_status, f"✓ {n_obj} objects, {n_lang} language(s), {n_existing} existing translations.", "#34c759")
+            except Exception as e:
+                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+            finally:
+                load_btn.disabled = False
+                load_btn.description = "Load Translations"
+
+        import threading
+        threading.Thread(target=_load_bg, daemon=True).start()
+
+    def on_add_lang(_):
+        lang = lang_dropdown.value
+        if lang in _languages:
+            set_status(conn_status, f"'{lang}' already exists.", "#ff9500")
+            return
+        _languages.append(lang)
+        for key in _trans_data:
+            _trans_data[key][lang] = ""
+            _original.setdefault(key, {})[lang] = ""
+        _render_grid()
+        _render_preview()
+        set_status(conn_status, f"Added '{lang}'. Use Auto-Translate to fill.", "#34c759")
+
+    def on_auto_translate(_):
+        if not _languages or not _objects:
+            set_status(conn_status, "Load translations first.", "#ff3b30")
+            return
+        auto_translate_btn.disabled = True
+        auto_translate_btn.description = "Translating…"
+
+        def _translate_bg():
+            try:
+                # Try deep-translator (Google Translate, no API key)
+                try:
+                    from deep_translator import GoogleTranslator
+                except ImportError:
+                    set_status(conn_status, "Install deep-translator: %pip install deep-translator", "#ff3b30")
+                    return
+
+                total = 0
+                for lang in _languages:
+                    # Convert locale to ISO 639-1 (de-DE → de, fr-FR → fr)
+                    target_lang = lang.split("-")[0].lower()
+                    if target_lang == "en":
+                        continue
+                    translator = GoogleTranslator(source="en", target=target_lang)
+
+                    # Batch all object names for this language
+                    to_translate = []
+                    keys_to_update = []
+                    for obj_type, table_name, obj_name, _ in _objects:
+                        key = _obj_key(obj_type, table_name, obj_name)
+                        if not _trans_data[key].get(lang):
+                            to_translate.append(obj_name)
+                            keys_to_update.append(key)
+
+                    if not to_translate:
+                        continue
+
+                    set_status(conn_status, f"Translating {len(to_translate)} names → {lang}…", GRAY_COLOR)
+
+                    # Translate in batches (deep-translator supports batch)
+                    try:
+                        results = translator.translate_batch(to_translate)
+                    except Exception:
+                        # Fallback: one by one
+                        results = []
+                        for name in to_translate:
+                            try:
+                                results.append(translator.translate(name))
+                            except Exception:
+                                results.append(name)
+
+                    for key, translated in zip(keys_to_update, results):
+                        if translated:
+                            _trans_data[key][lang] = translated
+                            total += 1
+
+                _render_grid()
+                _render_preview()
+                set_status(conn_status, f"✓ Auto-translated {total} names across {len(_languages)} language(s).", "#34c759")
+            except Exception as e:
+                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+            finally:
+                auto_translate_btn.disabled = False
+                auto_translate_btn.description = "🌐 Auto-Translate"
+
+        import threading
+        threading.Thread(target=_translate_bg, daemon=True).start()
+
+    def on_apply(_):
+        ds = _ds_name[0]
+        if not ds:
+            set_status(conn_status, "No model loaded.", "#ff3b30")
+            return
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        apply_btn.disabled = True
+        apply_btn.description = "Applying…"
+
+        def _apply_bg():
+            try:
+                # Collect changes
+                changes = []
+                for obj_type, table_name, obj_name, tom_path in _objects:
+                    key = _obj_key(obj_type, table_name, obj_name)
+                    trans = _trans_data.get(key, {})
+                    orig = _original.get(key, {})
+                    for lang in _languages:
+                        new_val = trans.get(lang, "")
+                        old_val = orig.get(lang, "")
+                        if new_val != old_val:
+                            changes.append((obj_type, table_name, obj_name, tom_path, lang, new_val))
+
+                if not changes:
+                    set_status(conn_status, "No changes to apply.", "#ff9500")
+                    return
+
+                set_status(conn_status, f"Applying {len(changes)} translation(s) via XMLA…", GRAY_COLOR)
+
+                import sys, io as _sio
+                _old = sys.stdout
+                sys.stdout = _sio.StringIO()
+                try:
+                    from sempy_labs.tom import connect_semantic_model
+                    with connect_semantic_model(dataset=ds, readonly=False, workspace=ws) as tom:
+                        for obj_type, table_name, obj_name, tom_path, lang, new_val in changes:
+                            if tom_path[0] == "table":
+                                obj = tom.model.Tables[table_name]
+                            elif tom_path[0] == "column":
+                                obj = tom.model.Tables[table_name].Columns[obj_name]
+                            elif tom_path[0] == "measure":
+                                obj = tom.model.Tables[table_name].Measures[obj_name]
+                            elif tom_path[0] == "hierarchy":
+                                obj = tom.model.Tables[table_name].Hierarchies[obj_name]
+                            else:
+                                continue
+                            tom.set_translation(object=obj, language=lang, property="Name", value=new_val)
+                        tom.model.SaveChanges()
+                finally:
+                    sys.stdout = _old
+
+                # Update originals to match
+                import copy
+                _original.clear()
+                _original.update(copy.deepcopy(_trans_data))
+                _render_grid()
+                _render_preview()
+                set_status(conn_status, f"✓ Applied {len(changes)} translation(s).", "#34c759")
+            except Exception as e:
+                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+            finally:
+                apply_btn.disabled = False
+                apply_btn.description = "✓ Apply Changes"
+
+        import threading
+        threading.Thread(target=_apply_bg, daemon=True).start()
+
+    load_btn.on_click(on_load)
+    add_lang_btn.on_click(on_add_lang)
+    auto_translate_btn.on_click(on_auto_translate)
+    apply_btn.on_click(on_apply)
+
+    widget = widgets.VBox(
+        [nav_row, grid_container, preview_container],
+        layout=widgets.Layout(padding="12px", gap="4px"),
+    )
     return widget
 
 
@@ -2347,6 +2724,7 @@ def pbi_fixer(
         _tab_options.append("\u26A1 Fixer")
     if perspective_editor_tab is not None:
         _tab_options.append("\U0001F441 Perspectives")
+    _tab_options.append("\U0001F310 Translations")
     _tab_options.append("\U0001F4BE Memory Analyzer")
     _tab_options.append("\U0001F4CB BPA")
     _tab_options.append("\U0001F4C4 Report BPA")
@@ -3067,6 +3445,12 @@ def pbi_fixer(
             workspace_input=workspace_input, report_input=report_input
         )
         tab_panels.append(persp_content)
+
+    # Translations tab
+    trans_content = _translations_tab(
+        workspace_input=workspace_input, report_input=report_input
+    )
+    tab_panels.append(trans_content)
 
     # Memory Analyzer tab (renamed from Vertipaq)
     vp_content = _vertipaq_tab(
