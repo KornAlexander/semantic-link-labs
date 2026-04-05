@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.158"
+__version__ = "1.2.159"
 
 import ipywidgets as widgets
 import io
@@ -435,60 +435,17 @@ def _bpa_tab(workspace_input=None, report_input=None):
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
-    # Fixer categories — each rule mapped to a group for grouped checkbox UI
-    _FIXER_GROUPS = {
-        "🔢 Data Types": [
-            "Do not use floating point data types",
-            "Do not use floating point data type",
-        ],
-        "📊 Formatting": [
-            "Provide format string for 'Date' columns",
-            "Provide format string for 'Month' columns",
-            "Provide format string for measures",
-            "Percentages should be formatted with thousands separators and 1 decimal",
-            "Format flag columns as Yes/No value strings",
-        ],
-        "🏷 Naming": [
-            "Objects should not start or end with a space",
-            "First letter of objects must be capitalized",
-        ],
-        "🔗 Schema": [
-            "Hide foreign keys",
-            "Do not summarize numeric columns",
-            "Mark primary keys",
-        ],
-        "📡 MDX": [
-            "Set IsAvailableInMdx to false on non-attribute columns",
-            "Set IsAvailableInMdx to true on necessary columns",
-        ],
-        "📝 Documentation": [
-            "visible objects with no description",
-        ],
-    }
-
-    # Fix selected rules button
-    fix_selected_btn = widgets.Button(description="⚡ Fix Selected", button_style="warning", layout=widgets.Layout(width="120px"))
+    # Fix by rule dropdown
+    rule_dropdown = widgets.Dropdown(options=["(no findings)"], value="(no findings)", layout=widgets.Layout(width="320px"))
+    fix_rule_btn = widgets.Button(description="\u26a1 Fix Rule", button_style="warning", layout=widgets.Layout(width="100px"))
     # Fix single row
     row_input = widgets.IntText(value=1, layout=widgets.Layout(width="60px"))
     fix_row_btn = widgets.Button(description="Fix Row", button_style="warning", layout=widgets.Layout(width="80px"))
     row_label = widgets.HTML(value=f'<span style="font-size:11px; color:#555; font-family:{FONT_FAMILY};">Row #:</span>')
     fix_row = widgets.HBox(
-        [fix_selected_btn, row_label, row_input, fix_row_btn],
-        layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 4px 0"),
+        [rule_dropdown, fix_rule_btn, row_label, row_input, fix_row_btn],
+        layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
-
-    # Grouped checkbox panel — populated after BPA run
-    _rule_checkboxes = {}  # {rule_name: Checkbox widget}
-    _group_toggles = {}    # {group_name: ToggleButton widget}
-    fixer_panel = widgets.VBox(layout=widgets.Layout(
-        max_height="220px", overflow_y="auto",
-        border=f"1px solid {BORDER_COLOR}", border_radius="8px",
-        padding="6px", background_color=SECTION_BG,
-        margin="0 0 4px 0",
-    ))
-    fixer_panel.children = [widgets.HTML(
-        value=f'<div style="padding:4px; color:{GRAY_COLOR}; font-size:11px; font-family:{FONT_FAMILY}; font-style:italic;">Run BPA to see fixable rules.</div>'
-    )]
 
     header_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Best Practice Analyzer</div>'
@@ -522,35 +479,40 @@ def _bpa_tab(workspace_input=None, report_input=None):
     _all_findings = []  # [(ds, rule_name, category, obj_name, obj_type, severity), ...]
 
     def _render_native_bpa(findings):
-        """Render BPA findings as native-style HTML tables grouped by category."""
+        """Render BPA findings as native-style HTML tables grouped by category with row numbers."""
         from collections import OrderedDict
         cats = OrderedDict()
+        # Build a global row index for Fix Row to work across categories
+        row_idx_map = {}  # (cat_name, item_idx) -> global_row_1based
+        global_row = 0
         for ds, rule_name, category, obj_name, obj_type, severity in findings:
             if rule_name.startswith("ERROR"):
-                cats.setdefault("Errors", []).append((ds, rule_name, obj_type, obj_name, severity))
-                continue
-            cats.setdefault(category, []).append((ds, rule_name, obj_type, obj_name, severity))
+                cats.setdefault("Errors", []).append((ds, rule_name, obj_type, obj_name, severity, global_row + 1))
+            else:
+                cats.setdefault(category, []).append((ds, rule_name, obj_type, obj_name, severity, global_row + 1))
+            global_row += 1
 
         _bpa_categories.clear()
         cat_labels = []
         for cat_name, items in cats.items():
             sev_counts = {}
-            for _, _, _, _, sev in items:
+            for _, _, _, _, sev, _ in items:
                 sev_counts[sev] = sev_counts.get(sev, 0) + 1
             sev_badge = " + ".join(f"\u26a0 ({v})" if k in ("2", "3") else f"\u2139 ({v})" for k, v in sorted(sev_counts.items()))
             cat_labels.append(f"{cat_name}\n{sev_badge}")
 
-            # Build per-category table (matching upstream style)
+            # Build per-category table with row numbers
             html = '<table border="1" style="border-collapse:collapse; width:100%; font-size:12px;">'
-            html += '<tr><th style="padding:4px 8px; text-align:left;">Rule Name</th><th style="padding:4px 8px;">Object Type</th><th style="padding:4px 8px;">Object Name</th><th style="padding:4px 8px; text-align:center;">Severity</th></tr>'
-            for ds, rule_name, obj_type, obj_name, severity in items:
+            html += '<tr><th style="padding:4px 6px; text-align:center; width:35px;">#</th><th style="padding:4px 8px; text-align:left;">Rule Name</th><th style="padding:4px 8px;">Object Type</th><th style="padding:4px 8px;">Object Name</th><th style="padding:4px 8px; text-align:center;">Severity</th></tr>'
+            for ds, rule_name, obj_type, obj_name, severity, row_num in items:
                 if rule_name.startswith("ERROR"):
-                    html += f'<tr><td colspan="4" style="color:#ff3b30; padding:4px 8px;">\u274c {ds}: {rule_name}</td></tr>'
+                    html += f'<tr><td style="padding:4px 6px; text-align:center; color:#888;">{row_num}</td><td colspan="4" style="color:#ff3b30; padding:4px 8px;">\u274c {ds}: {rule_name}</td></tr>'
                     continue
                 sev_icon = "\u26a0\ufe0f" if severity in ("2", "3") else "\u2139\ufe0f"
                 has_fix = _is_fixable(rule_name, obj_type)
                 fix_badge = ' <span style="color:#34c759; font-size:10px;">[fixable]</span>' if has_fix else ''
-                html += f'<tr><td style="padding:4px 8px; color:{ICON_ACCENT};">{rule_name}{fix_badge}</td>'
+                html += f'<tr><td style="padding:4px 6px; text-align:center; color:#888; font-size:11px;">{row_num}</td>'
+                html += f'<td style="padding:4px 8px; color:{ICON_ACCENT};">{rule_name}{fix_badge}</td>'
                 html += f'<td style="padding:4px 8px;">{obj_type}</td>'
                 html += f'<td style="padding:4px 8px;">{obj_name}</td>'
                 html += f'<td style="padding:4px 8px; text-align:center;">{sev_icon}</td></tr>'
@@ -610,7 +572,7 @@ def _bpa_tab(workspace_input=None, report_input=None):
         # Render native-style HTML with ipywidgets category tabs
         _render_native_bpa(_all_findings)
 
-        _update_fixer_panel()
+        _update_rule_dropdown()
         n = len([f for f in _all_findings if not f[1].startswith("ERROR")])
         n_fixable = sum(1 for f in _all_findings if _is_fixable(f[1], f[4]))
         results_box.children = [widgets.HTML(
@@ -621,81 +583,18 @@ def _bpa_tab(workspace_input=None, report_input=None):
         load_btn.disabled = False
         load_btn.description = "Run BPA"
 
-    def _update_fixer_panel():
-        """Build grouped checkboxes for fixable rules found in BPA results."""
+    def _update_rule_dropdown():
+        """Populate rule dropdown with fixable rules + counts."""
         from collections import Counter
-        _rule_checkboxes.clear()
-        _group_toggles.clear()
-
-        # Count fixable findings per rule
         fixable = [(f[1], f[4]) for f in _all_findings if _is_fixable(f[1], f[4])]
         counts = Counter(r for r, _ in fixable)
-        if not counts:
-            fixer_panel.children = [widgets.HTML(
-                value=f'<div style="padding:4px; color:#34c759; font-size:11px; font-family:{FONT_FAMILY};">✓ No fixable findings.</div>'
-            )]
-            return
-
-        # Build grouped UI
-        group_widgets = []
-        for group_name, group_rules in _FIXER_GROUPS.items():
-            # Filter to rules that actually have findings
-            active_rules = [(r, counts[r]) for r in group_rules if r in counts]
-            if not active_rules:
-                continue
-
-            # Group toggle (select/deselect all in group)
-            group_cb = widgets.Checkbox(
-                value=True, indent=False,
-                layout=widgets.Layout(width="18px", margin="0"),
-            )
-            group_label = widgets.HTML(
-                value=f'<span style="font-size:12px; font-weight:600; font-family:{FONT_FAMILY}; color:{ICON_ACCENT};">'
-                f'{group_name} ({sum(c for _, c in active_rules)})</span>'
-            )
-            group_header = widgets.HBox(
-                [group_cb, group_label],
-                layout=widgets.Layout(align_items="center", gap="4px", margin="4px 0 0 0"),
-            )
-
-            # Individual rule checkboxes
-            rule_cbs = []
-            for rule_name, count in active_rules:
-                cb = widgets.Checkbox(
-                    value=True, indent=False,
-                    layout=widgets.Layout(width="18px", margin="0"),
-                )
-                lbl = widgets.HTML(
-                    value=f'<span style="font-size:11px; font-family:{FONT_FAMILY}; color:#555;">'
-                    f'{rule_name} <span style="color:#888;">({count})</span></span>'
-                )
-                row = widgets.HBox(
-                    [cb, lbl],
-                    layout=widgets.Layout(align_items="center", gap="4px", margin="0 0 0 22px"),
-                )
-                _rule_checkboxes[rule_name] = cb
-                rule_cbs.append(row)
-
-            # Wire group toggle to children
-            _group_toggles[group_name] = (group_cb, [_rule_checkboxes[r] for r, _ in active_rules])
-
-            def _make_group_handler(g_cb, child_cbs):
-                def _on_group_change(change):
-                    for c in child_cbs:
-                        c.value = g_cb.value
-                return _on_group_change
-
-            group_cb.observe(_make_group_handler(group_cb, [_rule_checkboxes[r] for r, _ in active_rules]), names="value")
-
-            group_widgets.append(group_header)
-            group_widgets.extend(rule_cbs)
-
-        total_fixable = sum(counts.values())
-        summary = widgets.HTML(
-            value=f'<div style="font-size:11px; color:#555; font-family:{FONT_FAMILY}; margin:2px 0;">'
-            f'<b>{total_fixable}</b> fixable finding(s) across <b>{len(counts)}</b> rules — check rules to fix:</div>'
-        )
-        fixer_panel.children = [summary] + group_widgets
+        if counts:
+            opts = [f"{name} ({count})" for name, count in sorted(counts.items())]
+            rule_dropdown.options = opts
+            rule_dropdown.value = opts[0]
+        else:
+            rule_dropdown.options = ["(no fixable rules)"]
+            rule_dropdown.value = "(no fixable rules)"
 
     def _build_results(ws):
         if not _all_findings:
@@ -807,27 +706,23 @@ def _bpa_tab(workspace_input=None, report_input=None):
         fix_all_btn.disabled = False
         fix_all_btn.description = "\u26a1 Fix All"
 
-    def on_fix_selected(_):
-        """Fix all violations of the checked rules."""
-        # Collect selected rules
-        selected_rules = {name for name, cb in _rule_checkboxes.items() if cb.value}
-        if not selected_rules:
-            set_status(conn_status, "No rules selected.", "#ff9500")
+    def on_fix_rule(_):
+        """Fix all violations of the selected rule."""
+        selected = rule_dropdown.value
+        if not selected or selected.startswith("("):
             return
+        # Extract rule name (strip count suffix)
+        import re
+        m = re.match(r"(.+)\s+\(\d+\)$", selected)
+        target_rule = m.group(1) if m else selected
         ws = workspace_input.value.strip() if workspace_input else None
         ws = ws or None
-        fix_selected_btn.disabled = True
-        fix_selected_btn.description = "Fixing…"
+        fix_rule_btn.disabled = True
+        fix_rule_btn.description = "Fixing\u2026"
         fixed = 0
         errors = 0
         for ds, rule_name, category, obj_name, obj_type, severity in _all_findings:
-            if rule_name.startswith("ERROR"):
-                continue
-            key = rule_name.lower().strip()
-            # Check if this rule is selected (match by exact name or description fix)
-            if rule_name not in selected_rules and not (key == _desc_fix_rule and "visible objects with no description" in selected_rules):
-                continue
-            if not _is_fixable(rule_name, obj_type):
+            if rule_name != target_rule:
                 continue
             try:
                 result = _apply_fix(ds, ws, rule_name, obj_type, obj_name)
@@ -835,9 +730,9 @@ def _bpa_tab(workspace_input=None, report_input=None):
                     fixed += 1
             except Exception:
                 errors += 1
-        set_status(conn_status, f"✓ Fixed {fixed} of {len(selected_rules)} rule(s), {errors} error(s).", "#34c759" if errors == 0 else "#ff9500")
-        fix_selected_btn.disabled = False
-        fix_selected_btn.description = "⚡ Fix Selected"
+        set_status(conn_status, f"\u2713 '{target_rule}': fixed {fixed}, {errors} error(s).", "#34c759" if errors == 0 else "#ff9500")
+        fix_rule_btn.disabled = False
+        fix_rule_btn.description = "\u26a1 Fix Rule"
 
     def on_fix_row(_):
         """Fix a single violation by row number."""
@@ -862,7 +757,7 @@ def _bpa_tab(workspace_input=None, report_input=None):
 
     load_btn.on_click(on_load)
     fix_all_btn.on_click(on_fix_all)
-    fix_selected_btn.on_click(on_fix_selected)
+    fix_rule_btn.on_click(on_fix_rule)
     fix_row_btn.on_click(on_fix_row)
 
     # Output area for the native BPA HTML (rendered below the widget)
@@ -948,7 +843,7 @@ def _bpa_tab(workspace_input=None, report_input=None):
             padding="8px", background_color=SECTION_BG,
         ),
     )
-    widget = widgets.VBox([nav_row, fix_row, fixer_panel, header_label, bpa_cat_selector, native_html_container, results_box, bpa_output], layout=widgets.Layout(padding="12px", gap="4px"))
+    widget = widgets.VBox([nav_row, fix_row, header_label, bpa_cat_selector, native_html_container, results_box, bpa_output], layout=widgets.Layout(padding="12px", gap="4px"))
     return widget
 
 
@@ -2949,26 +2844,28 @@ def pbi_fixer(
             )
         _rpt_fixer_cbs["Apply IBCS Theme"] = lambda **kw: _apply_ibcs_theme(**kw)
 
-    # -- Build fixer callbacks for Model Explorer actions dropdown --
+    # -- Build fixer callbacks for Model Explorer actions dropdown (grouped) --
     _model_fixer_cbs = {}
-    if fix_discourage_implicit_measures is not None:
-        _model_fixer_cbs["Discourage Implicit Measures"] = lambda **kw: fix_discourage_implicit_measures(**kw)
+    _noop = lambda **kw: None  # no-op for separator labels
+
+    # ── Additive Actions ──
+    _model_fixer_cbs["── Add Objects ──"] = _noop
     if add_calculated_calendar is not None:
-        _model_fixer_cbs["Add Calendar Table"] = lambda **kw: add_calculated_calendar(**kw)
+        _model_fixer_cbs["  Add Calendar Table"] = lambda **kw: add_calculated_calendar(**kw)
     if add_last_refresh_table is not None:
-        _model_fixer_cbs["Add Last Refresh Table"] = lambda **kw: add_last_refresh_table(**kw)
+        _model_fixer_cbs["  Add Last Refresh Table"] = lambda **kw: add_last_refresh_table(**kw)
     if add_measure_table is not None:
-        _model_fixer_cbs["Add Measure Table"] = lambda **kw: add_measure_table(**kw)
+        _model_fixer_cbs["  Add Measure Table"] = lambda **kw: add_measure_table(**kw)
     if add_calc_group_units is not None:
-        _model_fixer_cbs["Add Units Calc Group"] = lambda **kw: add_calc_group_units(**kw)
+        _model_fixer_cbs["  Add Units Calc Group"] = lambda **kw: add_calc_group_units(**kw)
     if add_calc_group_time_intelligence is not None:
-        _model_fixer_cbs["Add Time Intelligence"] = lambda **kw: add_calc_group_time_intelligence(**kw)
+        _model_fixer_cbs["  Add Time Intelligence"] = lambda **kw: add_calc_group_time_intelligence(**kw)
     if add_measures_from_columns is not None:
-        _model_fixer_cbs["Auto-Create Measures from Columns"] = lambda **kw: add_measures_from_columns(
+        _model_fixer_cbs["  Auto-Create Measures from Columns"] = lambda **kw: add_measures_from_columns(
             dataset=kw.get("report", ""), workspace=kw.get("workspace"), scan_only=kw.get("scan_only", False)
         )
     if add_py_measures is not None:
-        _model_fixer_cbs["Add PY Measures (Y-1)"] = lambda **kw: add_py_measures(
+        _model_fixer_cbs["  Add PY Measures (Y-1)"] = lambda **kw: add_py_measures(
             dataset=kw.get("report", ""), workspace=kw.get("workspace"), scan_only=kw.get("scan_only", False)
         )
 
@@ -2985,7 +2882,11 @@ def pbi_fixer(
             tom.format_dax()
         print(f"\u2713 All DAX expressions formatted.")
 
-    _model_fixer_cbs["Format All DAX"] = lambda **kw: _format_all_dax(**kw)
+    # ── Formatting & Setup ──
+    _model_fixer_cbs["── Formatting & Setup ──"] = _noop
+    _model_fixer_cbs["  Format All DAX"] = lambda **kw: _format_all_dax(**kw)
+    if fix_discourage_implicit_measures is not None:
+        _model_fixer_cbs["  Discourage Implicit Measures"] = lambda **kw: fix_discourage_implicit_measures(**kw)
 
     # Incremental Refresh setup
     _setup_ir = _lazy_import("sempy_labs.semantic_model._Setup_IncrementalRefresh", "setup_incremental_refresh")
@@ -3014,7 +2915,10 @@ def pbi_fixer(
                     if not has_date:
                         continue
                     _setup_ir(dataset=ds, table_name=table.Name, workspace=ws, scan_only=scan)
-        _model_fixer_cbs["Setup Incremental Refresh"] = lambda **kw: _run_ir(**kw)
+        _model_fixer_cbs["  Setup Incremental Refresh"] = lambda **kw: _run_ir(**kw)
+
+    # ── BPA Auto-Fixers ──
+    _model_fixer_cbs["── BPA Fixers ──"] = _noop
 
     # BPA standalone fixers — also available as Model Explorer actions
     _bpa_fix_floating = _lazy_import("sempy_labs.semantic_model._Fix_FloatingPointDataType", "fix_floating_point_datatype")
@@ -3042,37 +2946,37 @@ def pbi_fixer(
         return lambda **kw: fn(dataset=kw.get("report", ""), workspace=kw.get("workspace"), scan_only=kw.get("scan_only", False))
 
     if _bpa_fix_floating is not None:
-        _model_fixer_cbs["Fix Floating Point Types"] = _sm_action(_bpa_fix_floating)
+        _model_fixer_cbs["  Fix Floating Point Types"] = _sm_action(_bpa_fix_floating)
     if _bpa_fix_mdx is not None:
-        _model_fixer_cbs["Fix IsAvailableInMDX (False)"] = _sm_action(_bpa_fix_mdx)
+        _model_fixer_cbs["  Fix IsAvailableInMDX (False)"] = _sm_action(_bpa_fix_mdx)
     if _bpa_fix_desc is not None:
-        _model_fixer_cbs["Fix Measure Descriptions"] = _sm_action(_bpa_fix_desc)
+        _model_fixer_cbs["  Fix Measure Descriptions"] = _sm_action(_bpa_fix_desc)
     if _bpa_fix_fk is not None:
-        _model_fixer_cbs["Hide Foreign Keys"] = _sm_action(_bpa_fix_fk)
+        _model_fixer_cbs["  Hide Foreign Keys"] = _sm_action(_bpa_fix_fk)
     if _bpa_fix_divide is not None:
-        _model_fixer_cbs["Fix DIVIDE Function"] = _sm_action(_bpa_fix_divide)
+        _model_fixer_cbs["  Fix DIVIDE Function"] = _sm_action(_bpa_fix_divide)
     if _bpa_fix_zero is not None:
-        _model_fixer_cbs["Fix Avoid Adding 0"] = _sm_action(_bpa_fix_zero)
+        _model_fixer_cbs["  Fix Avoid Adding 0"] = _sm_action(_bpa_fix_zero)
     if _bpa_fix_summarize is not None:
-        _model_fixer_cbs["Fix Do Not Summarize"] = _sm_action(_bpa_fix_summarize)
+        _model_fixer_cbs["  Fix Do Not Summarize"] = _sm_action(_bpa_fix_summarize)
     if _bpa_fix_pk is not None:
-        _model_fixer_cbs["Mark Primary Keys"] = _sm_action(_bpa_fix_pk)
+        _model_fixer_cbs["  Mark Primary Keys"] = _sm_action(_bpa_fix_pk)
     if _bpa_fix_trim is not None:
-        _model_fixer_cbs["Trim Object Names"] = _sm_action(_bpa_fix_trim)
+        _model_fixer_cbs["  Trim Object Names"] = _sm_action(_bpa_fix_trim)
     if _bpa_fix_cap is not None:
-        _model_fixer_cbs["Capitalize Object Names"] = _sm_action(_bpa_fix_cap)
+        _model_fixer_cbs["  Capitalize Object Names"] = _sm_action(_bpa_fix_cap)
     if _bpa_fix_pct is not None:
-        _model_fixer_cbs["Fix Percentage Format"] = _sm_action(_bpa_fix_pct)
+        _model_fixer_cbs["  Fix Percentage Format"] = _sm_action(_bpa_fix_pct)
     if _bpa_fix_whole is not None:
-        _model_fixer_cbs["Fix Whole Number Format"] = _sm_action(_bpa_fix_whole)
+        _model_fixer_cbs["  Fix Whole Number Format"] = _sm_action(_bpa_fix_whole)
     if _bpa_fix_flag is not None:
-        _model_fixer_cbs["Fix Flag Column Format"] = _sm_action(_bpa_fix_flag)
+        _model_fixer_cbs["  Fix Flag Column Format"] = _sm_action(_bpa_fix_flag)
     if _bpa_fix_mdx_true is not None:
-        _model_fixer_cbs["Fix IsAvailableInMDX (True)"] = _sm_action(_bpa_fix_mdx_true)
+        _model_fixer_cbs["  Fix IsAvailableInMDX (True)"] = _sm_action(_bpa_fix_mdx_true)
     if _bpa_fix_sort_month is not None:
-        _model_fixer_cbs["Fix Sort Month Column"] = _sm_action(_bpa_fix_sort_month)
+        _model_fixer_cbs["  Fix Sort Month Column"] = _sm_action(_bpa_fix_sort_month)
     if _bpa_fix_data_cat is not None:
-        _model_fixer_cbs["Fix Data Category"] = _sm_action(_bpa_fix_data_cat)
+        _model_fixer_cbs["  Fix Data Category"] = _sm_action(_bpa_fix_data_cat)
 
     # -- Clone callbacks (for action dropdowns — reuse shared impl) --
     def _clone_report(**kw):

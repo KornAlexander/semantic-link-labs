@@ -1382,7 +1382,7 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
     def on_run_action(_):
         """Run the action selected in the dropdown."""
         action = fixer_dropdown.value
-        if action == "Select action..." or action not in fixer_callbacks:
+        if action == "Select action..." or action.startswith("──") or action not in fixer_callbacks:
             set_status(conn_status, "Select an action from the dropdown first.", "#ff9500")
             return
         ws = workspace_input.value.strip() if workspace_input else None
@@ -1457,8 +1457,8 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
         total_findings = 0
         all_findings = []  # [(model, fixer_name, detail_line), ...]
         # Skip these from scan (they're additive actions, not violations)
-        skip_fixers = {"Auto-Create Measures from Columns", "Add PY Measures (Y-1)", "Format All DAX"}
-        fixer_names = [k for k in fixer_callbacks if k not in skip_fixers and k != "Select action..."]
+        skip_fixers = {"  Auto-Create Measures from Columns", "  Add PY Measures (Y-1)", "  Format All DAX"}
+        fixer_names = [k for k in fixer_callbacks if k not in skip_fixers and k != "Select action..." and not k.startswith("──")]
 
         for ds in items:
             set_status(conn_status, f"Scanning '{ds}'\u2026", GRAY_COLOR)
