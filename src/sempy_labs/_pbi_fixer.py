@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.168"
+__version__ = "1.2.169"
 
 import ipywidgets as widgets
 import io
@@ -43,8 +43,14 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
     _current_model = [None]
 
     load_btn = widgets.Button(description="Load Memory", button_style="primary", layout=widgets.Layout(width="120px"))
+    stop_mem_btn = widgets.Button(description="\u23f9 Stop", button_style="warning", layout=widgets.Layout(width="80px", display="none"))
+    _cancel_mem = [False]
     read_stats_cb = widgets.Checkbox(value=False, description="Read stats from data (Direct Lake)", indent=False, layout=widgets.Layout(width="auto"))
     conn_status = status_html()
+
+    def _on_stop_mem(_):
+        _cancel_mem[0] = True
+    stop_mem_btn.on_click(_on_stop_mem)
 
     model_dropdown = widgets.Dropdown(
         options=["(no models loaded)"],
@@ -166,10 +172,15 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
             return
         load_btn.disabled = True
         load_btn.description = "Loading\u2026"
+        stop_mem_btn.layout.display = ""
+        _cancel_mem[0] = False
         _vp_data = {}
         import io as _io
         from contextlib import redirect_stdout as _redirect
         for i, ds in enumerate(items):
+            if _cancel_mem[0]:
+                set_status(conn_status, f"\u23f9 Stopped after {len(_vp_data)}/{len(items)} models.", "#ff9500")
+                break
             set_status(conn_status, f"Memory Analyzer {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
             try:
                 import IPython.display as _ipd
@@ -203,11 +214,13 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
         set_status(conn_status, f"\u2713 Loaded {len(_vp_data)} model(s).", "#34c759")
         load_btn.disabled = False
         load_btn.description = "Load Memory"
+        stop_mem_btn.layout.display = "none"
+        _cancel_mem[0] = False
 
     load_btn.on_click(on_load)
 
     nav_row = widgets.HBox(
-        [load_btn, model_dropdown, read_stats_cb, conn_status],
+        [load_btn, stop_mem_btn, model_dropdown, read_stats_cb, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
     widget = widgets.VBox([nav_row, subtab_selector, df_container], layout=widgets.Layout(padding="12px", gap="4px"))
@@ -790,11 +803,18 @@ def _bpa_tab(workspace_input=None, report_input=None):
         return None
 
     load_btn = widgets.Button(description="Run BPA", button_style="primary", layout=widgets.Layout(width="120px"))
+    stop_bpa_btn = widgets.Button(description="\u23f9 Stop", button_style="warning", layout=widgets.Layout(width="80px", display="none"))
+    _cancel_bpa = [False]
     fix_all_btn = widgets.Button(description="\u26a1 Fix All", button_style="danger", layout=widgets.Layout(width="100px"))
     show_full_btn = widgets.Button(description="\U0001F4CB Show Full BPA", layout=widgets.Layout(width="150px"))
     conn_status = status_html()
+
+    def _on_stop_bpa(_):
+        _cancel_bpa[0] = True
+    stop_bpa_btn.on_click(_on_stop_bpa)
+
     nav_row = widgets.HBox(
-        [load_btn, fix_all_btn, show_full_btn, conn_status],
+        [load_btn, stop_bpa_btn, fix_all_btn, show_full_btn, conn_status],
         layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
     )
 
@@ -902,6 +922,8 @@ def _bpa_tab(workspace_input=None, report_input=None):
             return
         load_btn.disabled = True
         load_btn.description = "Scanning\u2026"
+        stop_bpa_btn.layout.display = ""
+        _cancel_bpa[0] = False
         import io as _io
         from contextlib import redirect_stdout as _redirect
         import IPython.display as _ipd
@@ -910,6 +932,9 @@ def _bpa_tab(workspace_input=None, report_input=None):
         _all_findings = []
 
         for i, ds in enumerate(items):
+            if _cancel_bpa[0]:
+                set_status(conn_status, f"\u23f9 Stopped after {i}/{len(items)} models.", "#ff9500")
+                break
             set_status(conn_status, f"BPA {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
             try:
                 buf = _io.StringIO()
@@ -945,6 +970,8 @@ def _bpa_tab(workspace_input=None, report_input=None):
         set_status(conn_status, f"\u2713 BPA: {n} finding(s) across {len(items)} model(s).", "#34c759" if n == 0 else "#ff9500")
         load_btn.disabled = False
         load_btn.description = "Run BPA"
+        stop_bpa_btn.layout.display = "none"
+        _cancel_bpa[0] = False
 
     def _update_rule_dropdown():
         """Populate rule dropdown with fixable rules + counts."""
