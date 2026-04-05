@@ -17,6 +17,7 @@ def generate_report_prototype(
     cols: int = 4,
     thumb_width: int = 480,
     thumb_height: int = 270,
+    on_progress=None,
 ) -> dict:
     """
     Generates a visual prototype of a Power BI report as SVG + Excalidraw.
@@ -81,25 +82,25 @@ def generate_report_prototype(
     if screenshots:
         from sempy_labs._helper_functions import _mount
         from sempy_labs.report import export_report
+        import sys
         import io as _io
         import threading
-        from contextlib import redirect_stdout as _redirect
 
         local_path = _mount()
         target_pages = [(idx, pg) for idx, pg in enumerate(pages_data) if include_hidden or not pg["hidden"]]
+        total_pages = len(target_pages)
         _lock = threading.Lock()
+        _done_count = [0]
 
         def _export_one(idx, pg):
             try:
-                buf = _io.StringIO()
-                with _redirect(buf):
-                    export_report(
-                        report=report,
-                        export_format="PNG",
-                        file_name=f"_prototype_{idx:02d}",
-                        page_name=pg["name"],
-                        workspace=workspace,
-                    )
+                export_report(
+                    report=report,
+                    export_format="PNG",
+                    file_name=f"_prototype_{idx:02d}",
+                    page_name=pg["name"],
+                    workspace=workspace,
+                )
                 png_path = f"{local_path}/Files/_prototype_{idx:02d}.png"
                 if os.path.exists(png_path):
                     with open(png_path, "rb") as f:
@@ -113,12 +114,29 @@ def generate_report_prototype(
             except Exception as e:
                 with _lock:
                     export_errors.append(f"'{pg['display_name']}': {str(e)[:200]}")
+            finally:
+                with _lock:
+                    _done_count[0] += 1
+                    done = _done_count[0]
+                if on_progress:
+                    try:
+                        on_progress(done, total_pages, pg["display_name"])
+                    except Exception:
+                        pass
 
-        threads = [threading.Thread(target=_export_one, args=(idx, pg)) for idx, pg in target_pages]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        # Redirect stdout globally to suppress export_report print spam
+        _real_stdout = sys.stdout
+        sys.stdout = _io.StringIO()
+        try:
+            if on_progress:
+                on_progress(0, total_pages, "starting exports...")
+            threads = [threading.Thread(target=_export_one, args=(idx, pg)) for idx, pg in target_pages]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        finally:
+            sys.stdout = _real_stdout
 
     # 3. Build diagram
     svg_str, excalidraw_str = _build_diagram(

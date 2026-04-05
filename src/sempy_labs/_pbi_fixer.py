@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.150"
+__version__ = "1.2.151"
 
 import ipywidgets as widgets
 import io
@@ -1335,6 +1335,9 @@ def _prototype_tab(workspace_input=None, report_input=None):
         try:
             set_status(conn_status, "Generating prototype\u2026", GRAY_COLOR)
 
+            def _proto_progress(done, total, page_name):
+                set_status(conn_status, f"Exporting screenshots: {done}/{total} \u2014 {page_name}", GRAY_COLOR)
+
             # Use standalone module
             from sempy_labs.report._report_prototype import generate_report_prototype
             result = generate_report_prototype(
@@ -1342,6 +1345,7 @@ def _prototype_tab(workspace_input=None, report_input=None):
                 workspace=ws,
                 screenshots=screenshots_cb.value,
                 include_hidden=hidden_cb.value,
+                on_progress=_proto_progress,
             )
 
             svg = result["svg"]
