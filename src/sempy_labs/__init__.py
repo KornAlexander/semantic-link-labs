@@ -296,6 +296,7 @@ from ._model_bpa_bulk import (
     create_model_bpa_semantic_model,
 )
 from ._model_bpa import run_model_bpa
+from ._fix_model_bpa import fix_model_bpa
 from ._model_bpa_rules import model_bpa_rules
 from ._model_dependencies import (
     measure_dependency_tree,
@@ -403,6 +404,7 @@ __all__ = [
     "resolve_report_name",
     "model_bpa_rules",
     "run_model_bpa",
+    "fix_model_bpa",
     "measure_dependency_tree",
     "get_measure_dependencies",
     "get_model_calc_dependencies",
