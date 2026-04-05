@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.173"
+__version__ = "1.2.174"
 
 import ipywidgets as widgets
 import io
@@ -300,8 +300,7 @@ def _translations_tab(workspace_input=None, report_input=None):
         html += '<tr style="background:#f5f5f5; position:sticky; top:0; z-index:1;">'
         html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Type</th>'
         html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Table</th>'
-        html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Object</th>'
-        html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Original Name</th>'
+        html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR};">Object Name</th>'
         for lang in langs:
             html += f'<th style="padding:4px 6px; text-align:left; border-bottom:2px solid {BORDER_COLOR}; color:{ICON_ACCENT};">{lang}</th>'
         html += '</tr>'
@@ -312,10 +311,9 @@ def _translations_tab(workspace_input=None, report_input=None):
             orig = _original.get(key, {})
             html += '<tr>'
             type_icon = "📊" if obj_type == "Table" else "🔢" if obj_type == "Column" else "Σ" if obj_type == "Measure" else "📁"
-            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#888;">{type_icon} {obj_type}</td>'
+            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#888;">{type_icon}</td>'
             html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0;">{table_name}</td>'
             html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; font-weight:600;">{obj_name}</td>'
-            html += f'<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#555;">{obj_name}</td>'
             for lang in langs:
                 val = trans.get(lang, "")
                 orig_val = orig.get(lang, "")
