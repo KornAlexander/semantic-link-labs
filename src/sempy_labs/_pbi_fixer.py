@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.167"
+__version__ = "1.2.168"
 
 import ipywidgets as widgets
 import io
@@ -166,50 +166,43 @@ def _vertipaq_tab(workspace_input=None, report_input=None):
             return
         load_btn.disabled = True
         load_btn.description = "Loading\u2026"
-        read_stats_val = read_stats_cb.value
-
-        def _load_bg():
-            nonlocal _vp_data
-            _vp_data = {}
-            import io as _io
-            from contextlib import redirect_stdout as _redirect
-            for i, ds in enumerate(items):
-                set_status(conn_status, f"Memory Analyzer {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
+        _vp_data = {}
+        import io as _io
+        from contextlib import redirect_stdout as _redirect
+        for i, ds in enumerate(items):
+            set_status(conn_status, f"Memory Analyzer {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
+            try:
+                import IPython.display as _ipd
+                _orig = _ipd.display
+                _ipd.display = lambda *a, **kw: None
                 try:
-                    import IPython.display as _ipd
-                    _orig = _ipd.display
-                    _ipd.display = lambda *a, **kw: None
-                    try:
-                        import IPython.core.display_functions as _idf
-                        _orig2 = _idf.display
-                        _idf.display = lambda *a, **kw: None
-                    except: _idf = None; _orig2 = None
-                    import sempy_labs._vertipaq as _vp_mod
-                    _orig_vp = getattr(_vp_mod, 'display', None)
-                    _vp_mod.display = lambda *a, **kw: None
-                    try:
-                        buf = _io.StringIO()
-                        with _redirect(buf):
-                            from sempy_labs import vertipaq_analyzer
-                            result = vertipaq_analyzer(dataset=ds, workspace=ws, read_stats_from_data=read_stats_val)
-                    finally:
-                        _ipd.display = _orig
-                        if _idf and _orig2: _idf.display = _orig2
-                        if _orig_vp: _vp_mod.display = _orig_vp
-                    _vp_data[ds] = result
-                    _current_model[0] = ds
-                except Exception as e:
-                    set_status(conn_status, f"Error loading '{ds}': {e}", "#ff3b30")
-            if _vp_data:
-                model_dropdown.options = list(_vp_data.keys())
-                model_dropdown.value = _current_model[0] or next(iter(_vp_data))
-            _render_subtab()
-            set_status(conn_status, f"\u2713 Loaded {len(_vp_data)} model(s).", "#34c759")
-            load_btn.disabled = False
-            load_btn.description = "Load Memory"
-
-        import threading
-        threading.Thread(target=_load_bg, daemon=True).start()
+                    import IPython.core.display_functions as _idf
+                    _orig2 = _idf.display
+                    _idf.display = lambda *a, **kw: None
+                except: _idf = None; _orig2 = None
+                import sempy_labs._vertipaq as _vp_mod
+                _orig_vp = getattr(_vp_mod, 'display', None)
+                _vp_mod.display = lambda *a, **kw: None
+                try:
+                    buf = _io.StringIO()
+                    with _redirect(buf):
+                        from sempy_labs import vertipaq_analyzer
+                        result = vertipaq_analyzer(dataset=ds, workspace=ws, read_stats_from_data=read_stats_cb.value)
+                finally:
+                    _ipd.display = _orig
+                    if _idf and _orig2: _idf.display = _orig2
+                    if _orig_vp: _vp_mod.display = _orig_vp
+                _vp_data[ds] = result
+                _current_model[0] = ds
+            except Exception as e:
+                set_status(conn_status, f"Error loading '{ds}': {e}", "#ff3b30")
+        if _vp_data:
+            model_dropdown.options = list(_vp_data.keys())
+            model_dropdown.value = _current_model[0] or next(iter(_vp_data))
+        _render_subtab()
+        set_status(conn_status, f"\u2713 Loaded {len(_vp_data)} model(s).", "#34c759")
+        load_btn.disabled = False
+        load_btn.description = "Load Memory"
 
     load_btn.on_click(on_load)
 
@@ -369,74 +362,63 @@ def _translations_tab(workspace_input=None, report_input=None):
         load_btn.description = "Loading…"
         _ds_name[0] = ds
 
-        def _load_bg():
-            try:
-                set_status(conn_status, f"Loading translations for '{ds}'…", GRAY_COLOR)
-                from sempy_labs.tom import connect_semantic_model
-                import Microsoft.AnalysisServices.Tabular as TOM
+        try:
+            set_status(conn_status, f"Loading translations for '{ds}'…", GRAY_COLOR)
+            from sempy_labs.tom import connect_semantic_model
+            import Microsoft.AnalysisServices.Tabular as TOM
 
-                _objects.clear()
-                _trans_data.clear()
-                _original.clear()
-                _languages.clear()
+            _objects.clear()
+            _trans_data.clear()
+            _original.clear()
+            _languages.clear()
 
-                with connect_semantic_model(dataset=ds, readonly=True, workspace=ws) as tom:
-                    # Collect languages
-                    for c in tom.model.Cultures:
-                        _languages.append(str(c.Name))
-
-                    # Collect objects
-                    for table in tom.model.Tables:
-                        t_name = str(table.Name)
-                        _objects.append(("Table", t_name, t_name, ("table", t_name)))
-                        for col in table.Columns:
-                            if col.Type == TOM.ColumnType.RowNumber:
+            with connect_semantic_model(dataset=ds, readonly=True, workspace=ws) as tom:
+                for c in tom.model.Cultures:
+                    _languages.append(str(c.Name))
+                for table in tom.model.Tables:
+                    t_name = str(table.Name)
+                    _objects.append(("Table", t_name, t_name, ("table", t_name)))
+                    for col in table.Columns:
+                        if col.Type == TOM.ColumnType.RowNumber:
+                            continue
+                        _objects.append(("Column", t_name, str(col.Name), ("column", t_name, str(col.Name))))
+                    for m in table.Measures:
+                        _objects.append(("Measure", t_name, str(m.Name), ("measure", t_name, str(m.Name))))
+                    for h in table.Hierarchies:
+                        _objects.append(("Hierarchy", t_name, str(h.Name), ("hierarchy", t_name, str(h.Name))))
+                for obj_type, table_name, obj_name, tom_path in _objects:
+                    key = _obj_key(obj_type, table_name, obj_name)
+                    _trans_data[key] = {}
+                    for lang in _languages:
+                        try:
+                            culture = tom.model.Cultures[lang]
+                            if tom_path[0] == "table":
+                                obj = tom.model.Tables[table_name]
+                            elif tom_path[0] == "column":
+                                obj = tom.model.Tables[table_name].Columns[obj_name]
+                            elif tom_path[0] == "measure":
+                                obj = tom.model.Tables[table_name].Measures[obj_name]
+                            elif tom_path[0] == "hierarchy":
+                                obj = tom.model.Tables[table_name].Hierarchies[obj_name]
+                            else:
                                 continue
-                            _objects.append(("Column", t_name, str(col.Name), ("column", t_name, str(col.Name))))
-                        for m in table.Measures:
-                            _objects.append(("Measure", t_name, str(m.Name), ("measure", t_name, str(m.Name))))
-                        for h in table.Hierarchies:
-                            _objects.append(("Hierarchy", t_name, str(h.Name), ("hierarchy", t_name, str(h.Name))))
+                            t = culture.ObjectTranslations[obj, TOM.TranslatedProperty.Caption]
+                            _trans_data[key][lang] = str(t.Value) if t and t.Value else ""
+                        except Exception:
+                            _trans_data[key][lang] = ""
 
-                    # Collect existing translations
-                    for obj_type, table_name, obj_name, tom_path in _objects:
-                        key = _obj_key(obj_type, table_name, obj_name)
-                        _trans_data[key] = {}
-                        for lang in _languages:
-                            try:
-                                culture = tom.model.Cultures[lang]
-                                if tom_path[0] == "table":
-                                    obj = tom.model.Tables[table_name]
-                                elif tom_path[0] == "column":
-                                    obj = tom.model.Tables[table_name].Columns[obj_name]
-                                elif tom_path[0] == "measure":
-                                    obj = tom.model.Tables[table_name].Measures[obj_name]
-                                elif tom_path[0] == "hierarchy":
-                                    obj = tom.model.Tables[table_name].Hierarchies[obj_name]
-                                else:
-                                    continue
-                                t = culture.ObjectTranslations[obj, TOM.TranslatedProperty.Caption]
-                                _trans_data[key][lang] = str(t.Value) if t and t.Value else ""
-                            except Exception:
-                                _trans_data[key][lang] = ""
-
-                # Snapshot original for diff
-                import copy
-                _original.update(copy.deepcopy(_trans_data))
-
-                _render_grid()
-                n_obj = len(_objects)
-                n_lang = len(_languages)
-                n_existing = sum(1 for key in _trans_data for lang in _trans_data[key] if _trans_data[key][lang])
-                set_status(conn_status, f"✓ {n_obj} objects, {n_lang} language(s), {n_existing} existing translations.", "#34c759")
-            except Exception as e:
-                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
-            finally:
-                load_btn.disabled = False
-                load_btn.description = "Load Translations"
-
-        import threading
-        threading.Thread(target=_load_bg, daemon=True).start()
+            import copy
+            _original.update(copy.deepcopy(_trans_data))
+            _render_grid()
+            n_obj = len(_objects)
+            n_lang = len(_languages)
+            n_existing = sum(1 for key in _trans_data for lang in _trans_data[key] if _trans_data[key][lang])
+            set_status(conn_status, f"✓ {n_obj} objects, {n_lang} language(s), {n_existing} existing translations.", "#34c759")
+        except Exception as e:
+            set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+        finally:
+            load_btn.disabled = False
+            load_btn.description = "Load Translations"
 
     def on_add_lang(_):
         lang = lang_dropdown.value
@@ -528,63 +510,59 @@ def _translations_tab(workspace_input=None, report_input=None):
         apply_btn.disabled = True
         apply_btn.description = "Applying…"
 
-        def _apply_bg():
-            try:
-                # Collect changes
-                changes = []
-                for obj_type, table_name, obj_name, tom_path in _objects:
-                    key = _obj_key(obj_type, table_name, obj_name)
-                    trans = _trans_data.get(key, {})
-                    orig = _original.get(key, {})
-                    for lang in _languages:
-                        new_val = trans.get(lang, "")
-                        old_val = orig.get(lang, "")
-                        if new_val != old_val:
-                            changes.append((obj_type, table_name, obj_name, tom_path, lang, new_val))
+        try:
+            changes = []
+            for obj_type, table_name, obj_name, tom_path in _objects:
+                key = _obj_key(obj_type, table_name, obj_name)
+                trans = _trans_data.get(key, {})
+                orig = _original.get(key, {})
+                for lang in _languages:
+                    new_val = trans.get(lang, "")
+                    old_val = orig.get(lang, "")
+                    if new_val != old_val:
+                        changes.append((obj_type, table_name, obj_name, tom_path, lang, new_val))
 
-                if not changes:
-                    set_status(conn_status, "No changes to apply.", "#ff9500")
-                    return
-
-                set_status(conn_status, f"Applying {len(changes)} translation(s) via XMLA…", GRAY_COLOR)
-
-                import sys, io as _sio
-                _old = sys.stdout
-                sys.stdout = _sio.StringIO()
-                try:
-                    from sempy_labs.tom import connect_semantic_model
-                    with connect_semantic_model(dataset=ds, readonly=False, workspace=ws) as tom:
-                        for obj_type, table_name, obj_name, tom_path, lang, new_val in changes:
-                            if tom_path[0] == "table":
-                                obj = tom.model.Tables[table_name]
-                            elif tom_path[0] == "column":
-                                obj = tom.model.Tables[table_name].Columns[obj_name]
-                            elif tom_path[0] == "measure":
-                                obj = tom.model.Tables[table_name].Measures[obj_name]
-                            elif tom_path[0] == "hierarchy":
-                                obj = tom.model.Tables[table_name].Hierarchies[obj_name]
-                            else:
-                                continue
-                            tom.set_translation(object=obj, language=lang, property="Name", value=new_val)
-                        tom.model.SaveChanges()
-                finally:
-                    sys.stdout = _old
-
-                # Update originals to match
-                import copy
-                _original.clear()
-                _original.update(copy.deepcopy(_trans_data))
-                _render_grid()
-                _render_preview()
-                set_status(conn_status, f"✓ Applied {len(changes)} translation(s).", "#34c759")
-            except Exception as e:
-                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
-            finally:
+            if not changes:
+                set_status(conn_status, "No changes to apply.", "#ff9500")
                 apply_btn.disabled = False
                 apply_btn.description = "✓ Apply Changes"
+                return
 
-        import threading
-        threading.Thread(target=_apply_bg, daemon=True).start()
+            set_status(conn_status, f"Applying {len(changes)} translation(s) via XMLA…", GRAY_COLOR)
+
+            import sys, io as _sio
+            _old = sys.stdout
+            sys.stdout = _sio.StringIO()
+            try:
+                from sempy_labs.tom import connect_semantic_model
+                with connect_semantic_model(dataset=ds, readonly=False, workspace=ws) as tom:
+                    for obj_type, table_name, obj_name, tom_path, lang, new_val in changes:
+                        if tom_path[0] == "table":
+                            obj = tom.model.Tables[table_name]
+                        elif tom_path[0] == "column":
+                            obj = tom.model.Tables[table_name].Columns[obj_name]
+                        elif tom_path[0] == "measure":
+                            obj = tom.model.Tables[table_name].Measures[obj_name]
+                        elif tom_path[0] == "hierarchy":
+                            obj = tom.model.Tables[table_name].Hierarchies[obj_name]
+                        else:
+                            continue
+                        tom.set_translation(object=obj, language=lang, property="Name", value=new_val)
+                    tom.model.SaveChanges()
+            finally:
+                sys.stdout = _old
+
+            import copy
+            _original.clear()
+            _original.update(copy.deepcopy(_trans_data))
+            _render_grid()
+            _render_preview()
+            set_status(conn_status, f"✓ Applied {len(changes)} translation(s).", "#34c759")
+        except Exception as e:
+            set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+        finally:
+            apply_btn.disabled = False
+            apply_btn.description = "✓ Apply Changes"
 
     load_btn.on_click(on_load)
     add_lang_btn.on_click(on_add_lang)
@@ -924,55 +902,49 @@ def _bpa_tab(workspace_input=None, report_input=None):
             return
         load_btn.disabled = True
         load_btn.description = "Scanning\u2026"
+        import io as _io
+        from contextlib import redirect_stdout as _redirect
+        import IPython.display as _ipd
+        _orig_display = _ipd.display
 
-        def _bpa_bg():
-            nonlocal _all_findings
-            import io as _io
-            from contextlib import redirect_stdout as _redirect
-            import IPython.display as _ipd
-            _orig_display = _ipd.display
+        _all_findings = []
 
-            _all_findings = []
-
-            for i, ds in enumerate(items):
-                set_status(conn_status, f"BPA {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
+        for i, ds in enumerate(items):
+            set_status(conn_status, f"BPA {i+1}/{len(items)}: '{ds}'\u2026", GRAY_COLOR)
+            try:
+                buf = _io.StringIO()
+                _ipd.display = lambda *a, **kw: None
                 try:
-                    buf = _io.StringIO()
-                    _ipd.display = lambda *a, **kw: None
-                    try:
-                        with _redirect(buf):
-                            from sempy_labs import run_model_bpa
-                            df = run_model_bpa(dataset=ds, workspace=ws, return_dataframe=True)
-                    finally:
-                        _ipd.display = _orig_display
+                    with _redirect(buf):
+                        from sempy_labs import run_model_bpa
+                        df = run_model_bpa(dataset=ds, workspace=ws, return_dataframe=True)
+                finally:
+                    _ipd.display = _orig_display
 
-                    if df is not None and len(df) > 0:
-                        for _, row in df.iterrows():
-                            rule_name = str(row.get("Rule Name", ""))
-                            category = str(row.get("Category", ""))
-                            obj_name = str(row.get("Object Name", ""))
-                            obj_type = str(row.get("Object Type", ""))
-                            severity = str(row.get("Severity", ""))
-                            _all_findings.append((ds, rule_name, category, obj_name, obj_type, severity))
-                except Exception as e:
-                    _all_findings.append((ds, f"ERROR: {e}", "Error", "", "", "3"))
+                if df is not None and len(df) > 0:
+                    for _, row in df.iterrows():
+                        rule_name = str(row.get("Rule Name", ""))
+                        category = str(row.get("Category", ""))
+                        obj_name = str(row.get("Object Name", ""))
+                        obj_type = str(row.get("Object Type", ""))
+                        severity = str(row.get("Severity", ""))
+                        _all_findings.append((ds, rule_name, category, obj_name, obj_type, severity))
+            except Exception as e:
+                _all_findings.append((ds, f"ERROR: {e}", "Error", "", "", "3"))
 
-            # Render native-style HTML with ipywidgets category tabs
-            _render_native_bpa(_all_findings)
+        # Render native-style HTML with ipywidgets category tabs
+        _render_native_bpa(_all_findings)
 
-            _update_rule_dropdown()
-            n = len([f for f in _all_findings if not f[1].startswith("ERROR")])
-            n_fixable = sum(1 for f in _all_findings if _is_fixable(f[1], f[4]))
-            results_box.children = [widgets.HTML(
-                value=f'<div style="font-size:12px; font-family:{FONT_FAMILY}; color:#555; margin:8px 0 4px 0;">'
-                f'{n} finding(s), <b>{n_fixable}</b> auto-fixable</div>'
-            )]
-            set_status(conn_status, f"\u2713 BPA: {n} finding(s) across {len(items)} model(s).", "#34c759" if n == 0 else "#ff9500")
-            load_btn.disabled = False
-            load_btn.description = "Run BPA"
-
-        import threading
-        threading.Thread(target=_bpa_bg, daemon=True).start()
+        _update_rule_dropdown()
+        n = len([f for f in _all_findings if not f[1].startswith("ERROR")])
+        n_fixable = sum(1 for f in _all_findings if _is_fixable(f[1], f[4]))
+        results_box.children = [widgets.HTML(
+            value=f'<div style="font-size:12px; font-family:{FONT_FAMILY}; color:#555; margin:8px 0 4px 0;">'
+            f'{n} finding(s), <b>{n_fixable}</b> auto-fixable</div>'
+        )]
+        set_status(conn_status, f"\u2713 BPA: {n} finding(s) across {len(items)} model(s).", "#34c759" if n == 0 else "#ff9500")
+        load_btn.disabled = False
+        load_btn.description = "Run BPA"
 
     def _update_rule_dropdown():
         """Populate rule dropdown with fixable rules + counts."""
@@ -1727,50 +1699,44 @@ def _prototype_tab(workspace_input=None, report_input=None):
         _cancel_proto[0] = False
         _page_images.clear()
         _rpt_name[0] = rpt
-        screenshots_val = screenshots_cb.value
-        hidden_val = hidden_cb.value
 
-        def _generate_bg():
-            def _proto_progress(done, total, page_name):
-                set_status(conn_status, f"Exporting screenshots: {done}/{total} \u2014 {page_name}", GRAY_COLOR)
+        def _proto_progress(done, total, page_name):
+            set_status(conn_status, f"Exporting screenshots: {done}/{total} \u2014 {page_name}", GRAY_COLOR)
 
-            try:
-                set_status(conn_status, "Generating prototype\u2026", GRAY_COLOR)
+        try:
+            set_status(conn_status, "Generating prototype\u2026", GRAY_COLOR)
 
-                # Use standalone module
-                from sempy_labs.report._report_prototype import generate_report_prototype
-                result = generate_report_prototype(
-                    report=rpt,
-                    workspace=ws,
-                    screenshots=screenshots_val,
-                    include_hidden=hidden_val,
-                    on_progress=_proto_progress,
-                )
+            # Use standalone module
+            from sempy_labs.report._report_prototype import generate_report_prototype
+            result = generate_report_prototype(
+                report=rpt,
+                workspace=ws,
+                screenshots=screenshots_cb.value,
+                include_hidden=hidden_cb.value,
+                on_progress=_proto_progress,
+            )
 
-                svg = result["svg"]
-                excalidraw = result["excalidraw"]
-                total = len(result["pages"])
-                n_screenshots = result["screenshots"]
-                export_errors = result["errors"]
+            svg = result["svg"]
+            excalidraw = result["excalidraw"]
+            total = len(result["pages"])
+            n_screenshots = result["screenshots"]
+            export_errors = result["errors"]
 
-                _svg_cache[0] = svg
-                _excalidraw_cache[0] = excalidraw
-                svg_display.value = svg
-                export_excalidraw_btn.layout.display = ""
-                export_svg_btn.layout.display = ""
-                err_msg = f" Export errors: {'; '.join(export_errors[:2])}" if export_errors else ""
-                set_status(conn_status, f"\u2713 Prototype: {total} pages, {n_screenshots} screenshots.{err_msg}", "#34c759" if not export_errors else "#ff9500")
+            _svg_cache[0] = svg
+            _excalidraw_cache[0] = excalidraw
+            svg_display.value = svg
+            export_excalidraw_btn.layout.display = ""
+            export_svg_btn.layout.display = ""
+            err_msg = f" Export errors: {'; '.join(export_errors[:2])}" if export_errors else ""
+            set_status(conn_status, f"\u2713 Prototype: {total} pages, {n_screenshots} screenshots.{err_msg}", "#34c759" if not export_errors else "#ff9500")
 
-            except Exception as e:
-                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
-            finally:
-                generate_btn.disabled = False
-                generate_btn.description = "\U0001F4D0 Generate Prototype"
-                stop_proto_btn.layout.display = "none"
-                _cancel_proto[0] = False
-
-        import threading
-        threading.Thread(target=_generate_bg, daemon=True).start()
+        except Exception as e:
+            set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+        finally:
+            generate_btn.disabled = False
+            generate_btn.description = "\U0001F4D0 Generate Prototype"
+            stop_proto_btn.layout.display = "none"
+            _cancel_proto[0] = False
 
     def _on_export_excalidraw(_):
         if not _excalidraw_cache[0]:
