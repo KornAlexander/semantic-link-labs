@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.147"
+__version__ = "1.2.148"
 
 import ipywidgets as widgets
 import io
@@ -2291,7 +2291,7 @@ def pbi_fixer(
     _tab_options.append("\U0001F4D0 Delta Analyzer")
     _tab_options.append("\U0001F4D0 Prototype")
     _tab_options.append("\U0001F5FA Model Diagram")
-    _tab_options.append("\u2699\ufe0f Script Runner")
+    # _tab_options.append("\u2699\ufe0f Script Runner")  # disabled for now
     _tab_options.append("\u2139\ufe0f About")
     if not _tab_options:
         _tab_options = ["\u26A1 Fixer"]
@@ -3033,11 +3033,11 @@ def pbi_fixer(
     )
     tab_panels.append(diagram_content)
 
-    # Script Runner tab
-    script_content = _script_tab(
-        workspace_input=workspace_input, report_input=report_input
-    )
-    tab_panels.append(script_content)
+    # Script Runner tab (disabled for now)
+    # script_content = _script_tab(
+    #     workspace_input=workspace_input, report_input=report_input
+    # )
+    # tab_panels.append(script_content)
 
     # About tab
     about_content = widgets.HTML(
