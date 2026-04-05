@@ -819,7 +819,7 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
         key = _current_key[0]
         if key and not _suppressing_observe[0]:
             node_type = key.split(":")[0]
-            if node_type in ("measure", "calc_item", "column", "table"):
+            if node_type in ("measure", "calc_item", "column", "table", "partition"):
                 _pending_changes[key] = {
                     "expression": preview.value,
                     "name": prop_name.value,
@@ -862,7 +862,7 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
         if key:
             _suppressing_observe[0] = True
             preview.value = _get_preview_text(_model_data, key)
-            preview.disabled = key.split(":")[0] not in ("measure", "calc_item", "rel")
+            preview.disabled = key.split(":")[0] not in ("measure", "calc_item", "rel", "partition")
             _populate_props(key)
             _suppressing_observe[0] = False
 
@@ -1142,7 +1142,7 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
             prop_format_str.value = pending.get("format_string", "")
             prop_display_folder.value = pending.get("display_folder", "")
             prop_description.value = pending.get("description", "")
-            preview.disabled = key.split(":")[0] not in ("measure", "calc_item", "rel")
+            preview.disabled = key.split(":")[0] not in ("measure", "calc_item", "rel", "partition")
             _populate_props(key)
             # Re-apply pending values (populate_props may overwrite)
             prop_name.value = pending.get("name", prop_name.value)
@@ -1152,7 +1152,7 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
             preview.value = pending.get("expression", preview.value)
         else:
             preview.value = _get_preview_text(_model_data, key)
-            preview.disabled = key.split(":")[0] not in ("measure", "calc_item", "rel")
+            preview.disabled = key.split(":")[0] not in ("measure", "calc_item", "rel", "partition")
             _populate_props(key)
 
         # Table data preview: show HTML table for table nodes, hide for others
@@ -1296,6 +1296,24 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
                                 if t:
                                     t["calc_items"][parts[2]]["expression"] = changes.get("expression", "")
                                 saved += 1
+                            elif node_type == "partition":
+                                p_name = parts[2] if len(parts) > 2 else ""
+                                for p_obj in tm.model.Tables[table_name].Partitions:
+                                    if p_obj.Name == p_name:
+                                        expr = changes.get("expression", "")
+                                        import Microsoft.AnalysisServices.Tabular as TOM
+                                        if p_obj.SourceType == TOM.PartitionSourceType.M:
+                                            p_obj.Source.Expression = expr
+                                        elif p_obj.SourceType == TOM.PartitionSourceType.Calculated:
+                                            p_obj.Source.Expression = expr
+                                        # Update local cache
+                                        t = _resolve_table(_model_data, parts[1])
+                                        if t:
+                                            for pt in t.get("partitions", []):
+                                                if pt["name"] == p_name:
+                                                    pt["expression"] = expr
+                                        saved += 1
+                                        break
                             elif node_type == "table":
                                 tm.model.Tables[table_name].Description = changes.get("description", "")
                                 t = _resolve_table(_model_data, parts[1])
