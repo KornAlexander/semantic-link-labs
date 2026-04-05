@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.171"
+__version__ = "1.2.172"
 
 import ipywidgets as widgets
 import io
@@ -488,34 +488,42 @@ def _translations_tab(workspace_input=None, report_input=None):
                 set_status(conn_status, f"Language {lang_idx+1}/{lang_count}: Translating {len(to_translate)} names → {lang}…", GRAY_COLOR)
                 auto_translate_btn.description = f"{lang} ({lang_idx+1}/{lang_count})"
 
-                # Build Spark DataFrame with names
+                # Translate in chunks of 50 for progress visibility
+                _CHUNK_SIZE = 50
                 schema = StructType([StructField("text", StringType(), True)])
-                df_names = spark.createDataFrame([(n,) for n in to_translate], schema)
-
-                # Translate using SynapseML (Azure AI Translator — no API key needed in Fabric)
-                translate = (
-                    Translate()
-                    .setTextCol("text")
-                    .setToLanguage(target_lang)
-                    .setOutputCol("translation")
-                    .setConcurrency(5)
-                )
-                df_result = (
-                    translate.transform(df_names)
-                    .withColumn("translation", flatten(col("translation.translations")))
-                    .withColumn("translation", col("translation.text"))
-                    .select("text", "translation")
-                )
-
-                # Extract results
-                results = df_result.collect()
                 lang_translated = 0
-                for row, key in zip(results, keys_to_update):
-                    translated_list = row["translation"]
-                    if translated_list and len(translated_list) > 0:
-                        _trans_data[key][lang] = str(translated_list[0])
-                        total += 1
-                        lang_translated += 1
+
+                for chunk_start in range(0, len(to_translate), _CHUNK_SIZE):
+                    chunk_end = min(chunk_start + _CHUNK_SIZE, len(to_translate))
+                    chunk_names = to_translate[chunk_start:chunk_end]
+                    chunk_keys = keys_to_update[chunk_start:chunk_end]
+
+                    set_status(conn_status, f"{lang} ({lang_idx+1}/{lang_count}): {chunk_start}/{len(to_translate)} names…", GRAY_COLOR)
+
+                    df_names = spark.createDataFrame([(n,) for n in chunk_names], schema)
+                    translate = (
+                        Translate()
+                        .setTextCol("text")
+                        .setToLanguage(target_lang)
+                        .setOutputCol("translation")
+                        .setConcurrency(5)
+                    )
+                    df_result = (
+                        translate.transform(df_names)
+                        .withColumn("translation", flatten(col("translation.translations")))
+                        .withColumn("translation", col("translation.text"))
+                        .select("text", "translation")
+                    )
+
+                    results = df_result.collect()
+                    for row, key in zip(results, chunk_keys):
+                        translated_list = row["translation"]
+                        if translated_list and len(translated_list) > 0:
+                            _trans_data[key][lang] = str(translated_list[0])
+                            total += 1
+                            lang_translated += 1
+
+                    set_status(conn_status, f"{lang} ({lang_idx+1}/{lang_count}): {chunk_end}/{len(to_translate)} names translated", GRAY_COLOR)
 
                 translated_langs += 1
                 set_status(conn_status, f"✓ {lang}: {lang_translated} translated ({translated_langs}/{lang_count} languages done)", "#34c759")
