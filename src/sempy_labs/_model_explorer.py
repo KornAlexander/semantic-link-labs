@@ -708,7 +708,7 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
     preview_label = widgets.HTML(
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Expression</div>'
     )
-    preview_box = panel_box([preview_label, table_row_dropdown, preview, table_preview_html, format_row], flex="1", min_height="450px")
+    preview_box = panel_box([preview_label, format_row, table_row_dropdown, preview, table_preview_html], flex="1", min_height="450px")
 
     # -- editable properties --
     props_label = widgets.HTML(
