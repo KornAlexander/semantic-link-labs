@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.143"
+__version__ = "1.2.144"
 
 import ipywidgets as widgets
 import io
@@ -2441,6 +2441,22 @@ def pbi_fixer(
     fix_visual_alignment = _lazy_import("sempy_labs.report._Fix_VisualAlignment", "fix_visual_alignment")
     if fix_visual_alignment is not None:
         _rpt_fixer_cbs["Fix Visual Alignment"] = lambda **kw: fix_visual_alignment(**kw)
+
+    # Theme editor actions
+    _show_theme = _lazy_import("sempy_labs.report._report_theme", "show_theme_summary")
+    _update_theme = _lazy_import("sempy_labs.report._report_theme", "update_theme_colors")
+    if _show_theme is not None:
+        _rpt_fixer_cbs["Show Theme Summary"] = lambda **kw: _show_theme(report=kw.get("report", ""), workspace=kw.get("workspace"))
+    if _update_theme is not None:
+        def _apply_ibcs_theme(**kw):
+            """Apply IBCS-style data colors (black/grey/red/green)."""
+            _update_theme(
+                report=kw.get("report", ""), workspace=kw.get("workspace"),
+                data_colors=["#404040", "#808080", "#C0C0C0", "#CC0000", "#00CC00", "#FFB800", "#0066CC", "#993399"],
+                background="#FFFFFF", foreground="#404040", table_accent="#404040",
+                scan_only=kw.get("scan_only", False),
+            )
+        _rpt_fixer_cbs["Apply IBCS Theme"] = lambda **kw: _apply_ibcs_theme(**kw)
 
     # -- Build fixer callbacks for Model Explorer actions dropdown --
     _model_fixer_cbs = {}
