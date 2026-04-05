@@ -268,10 +268,10 @@ def _table_summary(t):
 
 
 def _build_measures_with_folders(measures, table_key, base_indent, expanded, pending_changes):
-    """Build tree items for measures grouped by display folder.
+    """Build tree items for measures grouped by display folder (nested).
     Returns list of (indent, icon, label, key) tuples."""
     items = []
-    # Group measures by top-level display folder
+    # Group measures by display folder path
     folders = {}  # folder_path -> [measure_names]
     no_folder = []
     for mn in sorted(measures):
@@ -287,18 +287,55 @@ def _build_measures_with_folders(measures, table_key, base_indent, expanded, pen
         pfx = "\u270f " if mk in pending_changes else ""
         items.append((base_indent, "measure", f"{pfx}{mn}", mk))
 
-    # Measures in folders — grouped
+    # Collect all unique folder paths and build nested structure
+    # e.g. "Orders\PY" → ["Orders", "Orders\PY"]
+    all_folder_paths = set()
+    for folder_path in folders:
+        parts = folder_path.replace("/", "\\").split("\\")
+        for i in range(len(parts)):
+            all_folder_paths.add("\\".join(parts[: i + 1]))
+
+    # Count measures per folder (including nested — leaf folders only have direct measures)
+    def _count_under(prefix):
+        """Count measures in this folder and all subfolders."""
+        total = 0
+        for fp, ms in folders.items():
+            fp_norm = fp.replace("/", "\\")
+            if fp_norm == prefix or fp_norm.startswith(prefix + "\\"):
+                total += len(ms)
+        return total
+
+    # Build sorted unique folder paths and emit tree nodes
+    emitted_folders = set()
+
     for folder_path in sorted(folders):
-        folder_key = f"folder:{table_key}:{folder_path}"
-        is_exp = folder_key in expanded
-        marker = EXPANDED if is_exp else COLLAPSED
-        count = len(folders[folder_path])
-        items.append((base_indent, "folder", f"{marker} \U0001F4C1 {folder_path}  [{count}]", folder_key))
-        if is_exp:
+        parts = folder_path.replace("/", "\\").split("\\")
+        # Emit ancestor folders that haven't been emitted yet
+        for depth in range(len(parts)):
+            ancestor = "\\".join(parts[: depth + 1])
+            if ancestor not in emitted_folders:
+                emitted_folders.add(ancestor)
+                folder_key = f"folder:{table_key}:{ancestor}"
+                is_exp = folder_key in expanded
+                marker = EXPANDED if is_exp else COLLAPSED
+                count = _count_under(ancestor)
+                label_name = parts[depth]
+                items.append((base_indent + depth, "folder", f"{marker} \U0001F4C1 {label_name}  [{count}]", folder_key))
+
+        # Emit measures in this folder (only if deepest folder is expanded)
+        deepest_key = f"folder:{table_key}:{folder_path.replace('/', chr(92))}"
+        # Check if all ancestors + this folder are expanded
+        all_expanded = True
+        for depth in range(len(parts)):
+            ancestor = "\\".join(parts[: depth + 1])
+            if f"folder:{table_key}:{ancestor}" not in expanded:
+                all_expanded = False
+                break
+        if all_expanded:
             for mn in sorted(folders[folder_path]):
                 mk = f"measure:{table_key}:{mn}"
                 pfx = "\u270f " if mk in pending_changes else ""
-                items.append((base_indent + 1, "measure", f"{pfx}{mn}", mk))
+                items.append((base_indent + len(parts), "measure", f"{pfx}{mn}", mk))
 
     return items
 
@@ -1205,13 +1242,17 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
         _suppressing_observe[0] = False
 
     def _expand_folders(tables, table_prefix=""):
-        """Add all display folder keys to _expanded for given tables."""
+        """Add all display folder keys (including nested subfolders) to _expanded."""
         for t_name, t in tables.items():
             for mn in t.get("measures", {}):
                 df = t["measures"][mn].get("display_folder", "")
                 if df:
                     key_base = f"{table_prefix}{t_name}" if not table_prefix else f"{table_prefix}\x1f{t_name}"
-                    _expanded.add(f"folder:{key_base}:{df}")
+                    # Expand every level of the folder path
+                    parts = df.replace("/", "\\").split("\\")
+                    for i in range(len(parts)):
+                        ancestor = "\\".join(parts[: i + 1])
+                        _expanded.add(f"folder:{key_base}:{ancestor}")
 
     def on_expand_all(_):
         if _model_data:
