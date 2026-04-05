@@ -752,9 +752,9 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
         value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Properties</div>'
     )
     def _prop_input(label_text, width="100%", disabled=False):
-        lbl = widgets.HTML(value=f'<span style="font-size:11px; font-weight:600; color:#555; font-family:{FONT_FAMILY};">{label_text}</span>')
-        inp = widgets.Text(layout=widgets.Layout(width=width), disabled=disabled)
-        row = widgets.VBox([lbl, inp], layout=widgets.Layout(gap="0px"))
+        lbl = widgets.HTML(value=f'<span style="font-size:10px; font-weight:600; color:#555; font-family:{FONT_FAMILY};">{label_text}</span>')
+        inp = widgets.Text(layout=widgets.Layout(width=width, height="28px"), disabled=disabled)
+        row = widgets.VBox([lbl, inp], layout=widgets.Layout(gap="0px", margin="0"))
         return inp, row
 
     prop_name, prop_name_row = _prop_input("Name")
@@ -914,7 +914,7 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
 
     props_container = widgets.VBox(
         [prop_name_row, prop_table_row, prop_type_row, prop_format_row, prop_folder_row, prop_summarize_row, prop_desc_row],
-        layout=widgets.Layout(gap="4px"),
+        layout=widgets.Layout(gap="2px"),
     )
     props_placeholder = widgets.HTML(
         value=f'<div style="padding:12px; color:{GRAY_COLOR}; font-size:13px; font-family:{FONT_FAMILY}; font-style:italic;">Select an object to view properties</div>',
@@ -925,11 +925,9 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
         layout=widgets.Layout(
             flex="0 0 220px",
             min_height="450px",
-            max_height="450px",
-            overflow_y="auto",
             border=f"1px solid {BORDER_COLOR}",
             border_radius="8px",
-            padding="8px",
+            padding="6px",
             background_color=SECTION_BG,
         ),
     )
