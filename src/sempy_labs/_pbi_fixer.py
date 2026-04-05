@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.169"
+__version__ = "1.2.170"
 
 import ipywidgets as widgets
 import io
@@ -453,65 +453,72 @@ def _translations_tab(workspace_input=None, report_input=None):
         auto_translate_btn.disabled = True
         auto_translate_btn.description = "Translating…"
 
-        def _translate_bg():
-            try:
-                # Try deep-translator (Google Translate, no API key)
-                try:
-                    from deep_translator import GoogleTranslator
-                except ImportError:
-                    set_status(conn_status, "Install deep-translator: %pip install deep-translator", "#ff3b30")
-                    return
+        try:
+            from synapse.ml.services import Translate
+            from pyspark.sql.types import StructType, StructField, StringType
+            from pyspark.sql.functions import flatten, col
+            from sempy_labs._helper_functions import _create_spark_session
 
-                total = 0
-                for lang in _languages:
-                    # Convert locale to ISO 639-1 (de-DE → de, fr-FR → fr)
-                    target_lang = lang.split("-")[0].lower()
-                    if target_lang == "en":
-                        continue
-                    translator = GoogleTranslator(source="en", target=target_lang)
+            spark = _create_spark_session()
+            total = 0
 
-                    # Batch all object names for this language
-                    to_translate = []
-                    keys_to_update = []
-                    for obj_type, table_name, obj_name, _ in _objects:
-                        key = _obj_key(obj_type, table_name, obj_name)
-                        if not _trans_data[key].get(lang):
-                            to_translate.append(obj_name)
-                            keys_to_update.append(key)
+            for lang in _languages:
+                # Collect untranslated object names for this language
+                to_translate = []
+                keys_to_update = []
+                for obj_type, table_name, obj_name, _ in _objects:
+                    key = _obj_key(obj_type, table_name, obj_name)
+                    if not _trans_data[key].get(lang):
+                        to_translate.append(obj_name)
+                        keys_to_update.append(key)
 
-                    if not to_translate:
-                        continue
+                if not to_translate:
+                    continue
 
-                    set_status(conn_status, f"Translating {len(to_translate)} names → {lang}…", GRAY_COLOR)
+                # Convert locale (de-DE → de)
+                target_lang = lang.split("-")[0].lower()
+                if target_lang == "en":
+                    continue
 
-                    # Translate in batches (deep-translator supports batch)
-                    try:
-                        results = translator.translate_batch(to_translate)
-                    except Exception:
-                        # Fallback: one by one
-                        results = []
-                        for name in to_translate:
-                            try:
-                                results.append(translator.translate(name))
-                            except Exception:
-                                results.append(name)
+                set_status(conn_status, f"Translating {len(to_translate)} names → {lang} (Azure AI Translator)…", GRAY_COLOR)
 
-                    for key, translated in zip(keys_to_update, results):
-                        if translated:
-                            _trans_data[key][lang] = translated
-                            total += 1
+                # Build Spark DataFrame with names
+                schema = StructType([StructField("text", StringType(), True)])
+                df_names = spark.createDataFrame([(n,) for n in to_translate], schema)
 
-                _render_grid()
-                _render_preview()
-                set_status(conn_status, f"✓ Auto-translated {total} names across {len(_languages)} language(s).", "#34c759")
-            except Exception as e:
-                set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
-            finally:
-                auto_translate_btn.disabled = False
-                auto_translate_btn.description = "🌐 Auto-Translate"
+                # Translate using SynapseML (Azure AI Translator — no API key needed in Fabric)
+                translate = (
+                    Translate()
+                    .setTextCol("text")
+                    .setToLanguage(target_lang)
+                    .setOutputCol("translation")
+                    .setConcurrency(5)
+                )
+                df_result = (
+                    translate.transform(df_names)
+                    .withColumn("translation", flatten(col("translation.translations")))
+                    .withColumn("translation", col("translation.text"))
+                    .select("text", "translation")
+                )
 
-        import threading
-        threading.Thread(target=_translate_bg, daemon=True).start()
+                # Extract results
+                results = df_result.collect()
+                for row, key in zip(results, keys_to_update):
+                    translated_list = row["translation"]
+                    if translated_list and len(translated_list) > 0:
+                        _trans_data[key][lang] = str(translated_list[0])
+                        total += 1
+
+            _render_grid()
+            _render_preview()
+            set_status(conn_status, f"✓ Auto-translated {total} names across {len(_languages)} language(s) via Azure AI Translator.", "#34c759")
+        except ImportError:
+            set_status(conn_status, "SynapseML not available. Run in a Fabric Notebook.", "#ff3b30")
+        except Exception as e:
+            set_status(conn_status, f"Error: {str(e)[:300]}", "#ff3b30")
+        finally:
+            auto_translate_btn.disabled = False
+            auto_translate_btn.description = "🌐 Auto-Translate"
 
     def on_apply(_):
         ds = _ds_name[0]
