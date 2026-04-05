@@ -132,7 +132,29 @@ def _load_model_data_fast(dataset, workspace):
                 for h in table.Hierarchies:
                     t_info["hierarchies"][h.Name] = {"levels": [str(lvl.Name) for lvl in h.Levels]}
 
-            # Load relationships
+                # Augment column metadata from TOM (sort_by, is_key, data_category, etc.)
+                for col in table.Columns:
+                    c_name = str(col.Name)
+                    if c_name in t_info["columns"]:
+                        sort_by = ""
+                        try:
+                            if col.SortByColumn is not None:
+                                sort_by = str(col.SortByColumn.Name)
+                        except Exception:
+                            pass
+                        t_info["columns"][c_name]["is_key"] = bool(col.IsKey) if hasattr(col, "IsKey") else False
+                        t_info["columns"][c_name]["data_category"] = str(col.DataCategory) if hasattr(col, "DataCategory") and col.DataCategory else ""
+                        t_info["columns"][c_name]["sort_by_column"] = sort_by
+                        t_info["columns"][c_name]["encoding_hint"] = str(col.EncodingHint) if hasattr(col, "EncodingHint") else ""
+                        t_info["columns"][c_name]["is_nullable"] = bool(col.IsNullable) if hasattr(col, "IsNullable") else True
+
+                # Augment measure metadata from TOM
+                for m in table.Measures:
+                    m_name = str(m.Name)
+                    if m_name in t_info["measures"]:
+                        t_info["measures"][m_name]["is_hidden"] = bool(m.IsHidden) if hasattr(m, "IsHidden") else False
+
+            # Load relationships with extended props
             for rel in tm.model.Relationships:
                 try:
                     model_data["relationships"].append({
@@ -143,6 +165,8 @@ def _load_model_data_fast(dataset, workspace):
                         "cross_filter": str(rel.CrossFilteringBehavior) if hasattr(rel, "CrossFilteringBehavior") else "",
                         "is_active": bool(rel.IsActive) if hasattr(rel, "IsActive") else True,
                         "multiplicity": str(rel.FromCardinality) + " → " + str(rel.ToCardinality) if hasattr(rel, "FromCardinality") else "",
+                        "security_filtering": str(rel.SecurityFilteringBehavior) if hasattr(rel, "SecurityFilteringBehavior") else "",
+                        "rely_on_rri": bool(rel.RelyOnReferentialIntegrity) if hasattr(rel, "RelyOnReferentialIntegrity") else False,
                     })
                 except Exception:
                     pass
@@ -208,12 +232,23 @@ def _load_model_data_tom(dataset, workspace):
                     pass
                 t_info["partitions"] = partitions
             for col in table.Columns:
+                sort_by = ""
+                try:
+                    if col.SortByColumn is not None:
+                        sort_by = str(col.SortByColumn.Name)
+                except Exception:
+                    pass
                 t_info["columns"][col.Name] = {
                     "data_type": str(col.DataType) if hasattr(col, "DataType") else "",
                     "is_hidden": bool(col.IsHidden),
                     "expression": str(col.Expression) if hasattr(col, "Expression") and col.Expression else None,
                     "type": str(col.Type) if hasattr(col, "Type") else "",
                     "summarize_by": str(col.SummarizeBy) if hasattr(col, "SummarizeBy") else "",
+                    "is_key": bool(col.IsKey) if hasattr(col, "IsKey") else False,
+                    "data_category": str(col.DataCategory) if hasattr(col, "DataCategory") and col.DataCategory else "",
+                    "sort_by_column": sort_by,
+                    "encoding_hint": str(col.EncodingHint) if hasattr(col, "EncodingHint") else "",
+                    "is_nullable": bool(col.IsNullable) if hasattr(col, "IsNullable") else True,
                 }
             for m in table.Measures:
                 t_info["measures"][m.Name] = {
@@ -221,6 +256,7 @@ def _load_model_data_tom(dataset, workspace):
                     "format_string": str(m.FormatString) if m.FormatString else "",
                     "description": str(m.Description) if m.Description else "",
                     "display_folder": str(m.DisplayFolder) if m.DisplayFolder else "",
+                    "is_hidden": bool(m.IsHidden) if hasattr(m, "IsHidden") else False,
                 }
             for h in table.Hierarchies:
                 t_info["hierarchies"][h.Name] = {"levels": [str(lvl.Name) for lvl in h.Levels]}
@@ -241,7 +277,7 @@ def _load_model_data_tom(dataset, workspace):
             "default_mode": str(tm.model.DefaultMode) if hasattr(tm.model, "DefaultMode") else "",
         }
 
-        # Load relationships
+        # Load relationships with extended props
         for rel in tm.model.Relationships:
             try:
                 model_data["relationships"].append({
@@ -252,6 +288,8 @@ def _load_model_data_tom(dataset, workspace):
                     "cross_filter": str(rel.CrossFilteringBehavior) if hasattr(rel, "CrossFilteringBehavior") else "",
                     "is_active": bool(rel.IsActive) if hasattr(rel, "IsActive") else True,
                     "multiplicity": str(rel.FromCardinality) + " \u2192 " + str(rel.ToCardinality) if hasattr(rel, "FromCardinality") else "",
+                    "security_filtering": str(rel.SecurityFilteringBehavior) if hasattr(rel, "SecurityFilteringBehavior") else "",
+                    "rely_on_rri": bool(rel.RelyOnReferentialIntegrity) if hasattr(rel, "RelyOnReferentialIntegrity") else False,
                 })
             except Exception:
                 pass
@@ -509,7 +547,9 @@ def _get_preview_text(model_data, key):
                 f"To:   '{r['to_table']}'[{r['to_column']}]\n"
                 f"Multiplicity: {r.get('multiplicity', '')}\n"
                 f"Cross-filter: {r.get('cross_filter', '')}\n"
-                f"Active: {r.get('is_active', True)}"
+                f"Security filtering: {r.get('security_filtering', '')}\n"
+                f"Active: {r.get('is_active', True)}\n"
+                f"Rely on RRI: {r.get('rely_on_rri', False)}"
             )
         return ""
     if node_type == "measure":
@@ -764,6 +804,16 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
     prop_display_folder, prop_folder_row = _prop_input("Display Folder")
     prop_description, prop_desc_row = _prop_input("Description")
     prop_summarize_by, prop_summarize_row = _prop_input("Summarize By", disabled=True)
+    # Extended column properties (read-only, shown for columns)
+    prop_is_key, prop_is_key_row = _prop_input("Is Key", disabled=True)
+    prop_sort_by, prop_sort_by_row = _prop_input("Sort By Column", disabled=True)
+    prop_data_category, prop_data_cat_row = _prop_input("Data Category", disabled=True)
+    prop_encoding, prop_encoding_row = _prop_input("Encoding Hint", disabled=True)
+    prop_nullable, prop_nullable_row = _prop_input("Is Nullable", disabled=True)
+    # Extended measure property
+    prop_is_hidden, prop_is_hidden_row = _prop_input("Is Hidden", disabled=True)
+    # Extended relationship properties (shown in expression panel via _get_preview_text)
+    # These use the existing expression textarea, no new widgets needed
 
     # Unified save button with dirty state + pending changes buffer
     _is_dirty = [False]
@@ -913,7 +963,9 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
     prop_description.observe(_mark_dirty, names="value")
 
     props_container = widgets.VBox(
-        [prop_name_row, prop_table_row, prop_type_row, prop_format_row, prop_folder_row, prop_summarize_row, prop_desc_row],
+        [prop_name_row, prop_table_row, prop_type_row, prop_format_row, prop_folder_row,
+         prop_summarize_row, prop_is_key_row, prop_sort_by_row, prop_data_cat_row,
+         prop_encoding_row, prop_nullable_row, prop_is_hidden_row, prop_desc_row],
         layout=widgets.Layout(gap="2px"),
     )
     props_placeholder = widgets.HTML(
@@ -950,6 +1002,13 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
         prop_format_row.layout.display = ""
         prop_folder_row.layout.display = ""
         prop_summarize_row.layout.display = "none"
+        # Hide extended props by default
+        prop_is_key_row.layout.display = "none"
+        prop_sort_by_row.layout.display = "none"
+        prop_data_cat_row.layout.display = "none"
+        prop_encoding_row.layout.display = "none"
+        prop_nullable_row.layout.display = "none"
+        prop_is_hidden_row.layout.display = "none"
 
         # Strip model prefix from table key for display
         raw_table = parts[1] if len(parts) > 1 else ""
@@ -962,6 +1021,8 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
             prop_format_str.value = m.get("format_string", "")
             prop_display_folder.value = m.get("display_folder", "")
             prop_description.value = m.get("description", "")
+            prop_is_hidden.value = str(m.get("is_hidden", False))
+            prop_is_hidden_row.layout.display = ""
         elif node_type == "column":
             t = _resolve_table(_model_data, raw_table)
             c = t["columns"].get(parts[2], {}) if t else {}
@@ -972,6 +1033,17 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
             prop_format_row.layout.display = "none"
             prop_folder_row.layout.display = "none"
             prop_summarize_row.layout.display = ""
+            # Show extended column properties
+            prop_is_key.value = str(c.get("is_key", False))
+            prop_is_key_row.layout.display = ""
+            prop_sort_by.value = c.get("sort_by_column", "") or "—"
+            prop_sort_by_row.layout.display = ""
+            prop_data_category.value = c.get("data_category", "") or "—"
+            prop_data_cat_row.layout.display = ""
+            prop_encoding.value = c.get("encoding_hint", "") or "Default"
+            prop_encoding_row.layout.display = ""
+            prop_nullable.value = str(c.get("is_nullable", True))
+            prop_nullable_row.layout.display = ""
         elif node_type == "table":
             t = _resolve_table(_model_data, raw_table) or {}
             prop_name.value, prop_table.value = display_table, ""
