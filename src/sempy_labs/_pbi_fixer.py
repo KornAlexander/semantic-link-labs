@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.174"
+__version__ = "1.2.175"
 
 import ipywidgets as widgets
 import io
@@ -495,6 +495,8 @@ def _translations_tab(workspace_input=None, report_input=None):
                         chunk_keys = keys_to_update[chunk_start:chunk_end]
 
                         set_status(conn_status, f"{lang} ({lang_idx+1}/{lang_count}): {chunk_start}/{len(to_translate)} names…", GRAY_COLOR)
+
+                        set_status(conn_status, f"{lang} ({lang_idx+1}/{lang_count}): {chunk_start}/{len(to_translate)} — calling Azure AI Translator (first call may take 30-60s)…", GRAY_COLOR)
 
                         df_names = spark.createDataFrame([(n,) for n in chunk_names], schema)
                         translate = (
