@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.142"
+__version__ = "1.2.143"
 
 import ipywidgets as widgets
 import io
@@ -2436,6 +2436,11 @@ def pbi_fixer(
         _rpt_fixer_cbs["Fix Page Size"] = lambda **kw: fix_page_size(**kw)
     if fix_hide_visual_filters is not None:
         _rpt_fixer_cbs["Hide Visual Filters"] = lambda **kw: fix_hide_visual_filters(**kw)
+
+    # Visual Alignment fixer
+    fix_visual_alignment = _lazy_import("sempy_labs.report._Fix_VisualAlignment", "fix_visual_alignment")
+    if fix_visual_alignment is not None:
+        _rpt_fixer_cbs["Fix Visual Alignment"] = lambda **kw: fix_visual_alignment(**kw)
 
     # -- Build fixer callbacks for Model Explorer actions dropdown --
     _model_fixer_cbs = {}
