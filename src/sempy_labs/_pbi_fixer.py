@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.146"
+__version__ = "1.2.147"
 
 import ipywidgets as widgets
 import io
@@ -1566,6 +1566,186 @@ def _diagram_tab(workspace_input=None, report_input=None):
     return widget
 
 
+# ---------------------------------------------------------------------------
+# Script Runner tab (inline)
+# ---------------------------------------------------------------------------
+def _script_tab(workspace_input=None, report_input=None):
+    """Build the Script Runner tab for executing Python scripts with TOM model access."""
+    from sempy_labs._ui_components import (
+        FONT_FAMILY, BORDER_COLOR, GRAY_COLOR, ICON_ACCENT, SECTION_BG,
+        status_html, set_status,
+    )
+
+    _TEMPLATES = {
+        "-- Select template --": "",
+        "List all measures": """for table in model.Tables:
+    for m in table.Measures:
+        print(f"[{table.Name}][{m.Name}] = {m.Expression[:60]}")
+""",
+        "List all columns with types": """for table in model.Tables:
+    for c in table.Columns:
+        print(f"'{table.Name}'[{c.Name}] ({c.DataType})")
+""",
+        "List relationships": """for r in model.Relationships:
+    print(f"'{r.FromTable.Name}'[{r.FromColumn.Name}] -> '{r.ToTable.Name}'[{r.ToColumn.Name}]  Active={r.IsActive}")
+""",
+        "List tables with row counts": """import sempy.fabric as fabric
+ws = workspace  # from scope
+for table in model.Tables:
+    print(f"{table.Name}: {len(table.Columns)} columns, {len(table.Measures)} measures")
+""",
+        "Find unused measures": """used = set()
+for table in model.Tables:
+    for m in table.Measures:
+        expr = str(m.Expression) if m.Expression else ""
+        for t2 in model.Tables:
+            for m2 in t2.Measures:
+                if m2.Name != m.Name and f"[{m.Name}]" in str(m2.Expression or ""):
+                    used.add(m.Name)
+for table in model.Tables:
+    for m in table.Measures:
+        if m.Name not in used and not m.IsHidden:
+            print(f"Possibly unused: [{m.Name}]")
+""",
+        "Hide all columns starting with 'ID'": """count = 0
+for table in model.Tables:
+    for c in table.Columns:
+        if c.Name.startswith("ID") and not c.IsHidden:
+            if not readonly:
+                c.IsHidden = True
+                count += 1
+            else:
+                print(f"Would hide: '{table.Name}'[{c.Name}]")
+                count += 1
+if not readonly:
+    model.SaveChanges()
+print(f"Hidden {count} column(s).")
+""",
+    }
+
+    template_dd = widgets.Dropdown(
+        options=list(_TEMPLATES.keys()),
+        value="-- Select template --",
+        layout=widgets.Layout(width="300px"),
+    )
+    run_btn = widgets.Button(description="\u25B6 Run Script", button_style="primary", layout=widgets.Layout(width="120px"))
+    write_cb = widgets.Checkbox(value=False, description="Enable write mode (XMLA)", indent=False, layout=widgets.Layout(width="auto"))
+    conn_status = status_html()
+
+    script_input = widgets.Textarea(
+        value="# Python script with TOM model access\n# Variables in scope: model, tom, workspace, readonly\n\nfor table in model.Tables:\n    print(table.Name)\n",
+        layout=widgets.Layout(width="100%", height="200px", font_family="monospace"),
+    )
+
+    output_html = widgets.HTML(value="")
+    output_container = widgets.VBox(
+        [output_html],
+        layout=widgets.Layout(
+            max_height="300px", overflow_y="auto",
+            border=f"1px solid {BORDER_COLOR}", border_radius="8px",
+            padding="8px", background_color="#f8f9fa",
+        ),
+    )
+
+    def _on_template(change):
+        tpl = change.get("new", "")
+        code = _TEMPLATES.get(tpl, "")
+        if code:
+            script_input.value = code
+
+    template_dd.observe(_on_template, names="value")
+
+    def _on_run(_):
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        ds_input = report_input.value.strip() if report_input else ""
+        if not ds_input:
+            set_status(conn_status, "Enter a model name.", "#ff3b30")
+            return
+        ds = ds_input.split(",")[0].strip()
+        for pfx in ("\U0001F4C4 ", "\U0001F4CA "):
+            if ds.startswith(pfx):
+                ds = ds[len(pfx):]
+
+        code = script_input.value
+        if not code.strip():
+            set_status(conn_status, "Enter a script.", "#ff3b30")
+            return
+
+        readonly = not write_cb.value
+        run_btn.disabled = True
+        run_btn.description = "Running\u2026"
+        set_status(conn_status, f"Executing on '{ds}' ({'readonly' if readonly else 'WRITE'})\u2026", GRAY_COLOR)
+
+        import io as _io
+        from contextlib import redirect_stdout as _redirect
+
+        try:
+            from sempy_labs.tom import connect_semantic_model
+            buf = _io.StringIO()
+            with connect_semantic_model(dataset=ds, readonly=readonly, workspace=ws) as tom:
+                scope = {
+                    "tom": tom,
+                    "model": tom.model,
+                    "workspace": ws,
+                    "readonly": readonly,
+                    "print": lambda *a, **kw: _io.StringIO.write(buf, " ".join(str(x) for x in a) + kw.get("end", "\n")),
+                }
+                # Add common imports
+                try:
+                    import sempy.fabric as fabric
+                    scope["fabric"] = fabric
+                except Exception:
+                    pass
+                try:
+                    import pandas as pd
+                    scope["pd"] = pd
+                except Exception:
+                    pass
+                try:
+                    import Microsoft.AnalysisServices.Tabular as TOM
+                    scope["TOM"] = TOM
+                except Exception:
+                    pass
+
+                exec(compile(code, "<script>", "exec"), scope)
+
+            captured = buf.getvalue()
+            if captured:
+                lines = captured.rstrip().split("\n")
+                html = '<pre style="font-family:monospace; font-size:12px; margin:0; white-space:pre-wrap;">'
+                for line in lines:
+                    html += f"{line}\n"
+                html += "</pre>"
+                output_html.value = html
+            else:
+                output_html.value = '<div style="color:#888; font-size:12px;">Script completed with no output.</div>'
+            set_status(conn_status, f"\u2713 Script executed ({len(captured.splitlines())} lines output).", "#34c759")
+
+        except Exception as e:
+            output_html.value = f'<pre style="color:#ff3b30; font-size:12px;">{str(e)}</pre>'
+            set_status(conn_status, f"Error: {str(e)[:80]}", "#ff3b30")
+        finally:
+            run_btn.disabled = False
+            run_btn.description = "\u25B6 Run Script"
+
+    run_btn.on_click(_on_run)
+
+    nav_row = widgets.HBox(
+        [template_dd, run_btn, write_cb, conn_status],
+        layout=widgets.Layout(align_items="center", gap="8px", margin="0 0 8px 0"),
+    )
+    header = widgets.HTML(
+        value=f'<div style="font-size:12px; font-weight:600; color:{ICON_ACCENT}; font-family:{FONT_FAMILY}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">'
+        f'Script Runner — Python with TOM Model Access</div>'
+        f'<div style="font-size:11px; color:#888; font-family:{FONT_FAMILY}; margin-bottom:8px;">'
+        f'Variables: <code>model</code>, <code>tom</code>, <code>TOM</code>, <code>fabric</code>, <code>pd</code>, <code>workspace</code>, <code>readonly</code></div>'
+    )
+
+    widget = widgets.VBox([nav_row, header, script_input, output_container], layout=widgets.Layout(padding="12px", gap="4px"))
+    return widget
+
+
 def pbi_fixer(
     workspace: Optional[str | UUID] = None,
     report: Optional[str | UUID] = None,
@@ -2111,6 +2291,7 @@ def pbi_fixer(
     _tab_options.append("\U0001F4D0 Delta Analyzer")
     _tab_options.append("\U0001F4D0 Prototype")
     _tab_options.append("\U0001F5FA Model Diagram")
+    _tab_options.append("\u2699\ufe0f Script Runner")
     _tab_options.append("\u2139\ufe0f About")
     if not _tab_options:
         _tab_options = ["\u26A1 Fixer"]
@@ -2851,6 +3032,12 @@ def pbi_fixer(
         workspace_input=workspace_input, report_input=report_input
     )
     tab_panels.append(diagram_content)
+
+    # Script Runner tab
+    script_content = _script_tab(
+        workspace_input=workspace_input, report_input=report_input
+    )
+    tab_panels.append(script_content)
 
     # About tab
     about_content = widgets.HTML(
