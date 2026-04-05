@@ -951,5 +951,92 @@ def report_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks
     scan_btn.on_click(on_scan)
     run_action_btn.on_click(on_run_action)
 
-    widget = widgets.VBox([nav_row, action_row, tree_header, panels], layout=widgets.Layout(padding="12px", gap="4px"))
+    # --- Format Overview panel (subtab within Report Explorer) ---
+    format_btn = widgets.Button(description="\U0001F4CB Format Overview", layout=widgets.Layout(width="160px"))
+    convert_all_btn = widgets.Button(description="\u26A1 Convert All Legacy", button_style="danger", layout=widgets.Layout(width="180px", display="none"))
+    format_html = widgets.HTML(value="")
+    format_container = widgets.VBox(
+        [format_html],
+        layout=widgets.Layout(
+            display="none", max_height="300px", overflow_y="auto",
+            border=f"1px solid {BORDER_COLOR}", border_radius="8px",
+            padding="8px", background_color=SECTION_BG,
+        ),
+    )
+    _format_data = []  # [(name, report_id, format), ...]
+
+    def _on_format_overview(_):
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        format_btn.disabled = True
+        format_btn.description = "Loading\u2026"
+        _format_data.clear()
+        try:
+            rpt_list = _list_workspace_reports(ws)
+            html = '<table style="border-collapse:collapse; width:100%; font-size:12px; font-family:monospace;">'
+            html += '<tr style="background:#f5f5f5;"><th style="padding:4px 8px; text-align:left;">Report</th><th style="padding:4px 8px; text-align:left;">Format</th></tr>'
+            n_legacy = 0
+            for name, fmt in rpt_list:
+                _format_data.append((name, fmt))
+                if fmt == "PBIR":
+                    badge = '<span style="color:#34c759; font-weight:600;">PBIR</span>'
+                elif "Legacy" in fmt:
+                    badge = f'<span style="color:#ff9500; font-weight:600;">{fmt} \u26a0\ufe0f</span>'
+                    n_legacy += 1
+                else:
+                    badge = f'<span style="color:#888;">{fmt or "unknown"}</span>'
+                html += f'<tr><td style="padding:3px 8px; border-bottom:1px solid #f0f0f0;">{name}</td>'
+                html += f'<td style="padding:3px 8px; border-bottom:1px solid #f0f0f0;">{badge}</td></tr>'
+            html += '</table>'
+            html += f'<div style="font-size:11px; color:#555; margin-top:4px;">{len(rpt_list)} report(s), {n_legacy} legacy</div>'
+            format_html.value = html
+            format_container.layout.display = ""
+            if n_legacy > 0:
+                convert_all_btn.layout.display = ""
+            else:
+                convert_all_btn.layout.display = "none"
+            set_status(conn_status, f"\u2713 {len(rpt_list)} reports, {n_legacy} PBIRLegacy.", "#34c759" if n_legacy == 0 else "#ff9500")
+        except Exception as e:
+            format_html.value = f'<div style="color:#ff3b30;">Error: {str(e)[:100]}</div>'
+            format_container.layout.display = ""
+        format_btn.disabled = False
+        format_btn.description = "\U0001F4CB Format Overview"
+
+    def _on_convert_all(_):
+        ws = workspace_input.value.strip() if workspace_input else None
+        ws = ws or None
+        legacy = [name for name, fmt in _format_data if "Legacy" in fmt]
+        if not legacy:
+            return
+        convert_all_btn.disabled = True
+        convert_all_btn.description = "Converting\u2026"
+        converted = 0
+        for rpt in legacy:
+            try:
+                set_status(conn_status, f"Converting '{rpt}'\u2026", GRAY_COLOR)
+                try:
+                    import sempy_labs.report as _rep
+                    _rep.upgrade_to_pbir(report=rpt, workspace=ws)
+                    converted += 1
+                except Exception:
+                    from sempy_labs.report._Fix_UpgradeToPbir import fix_upgrade_to_pbir
+                    fix_upgrade_to_pbir(report=rpt, workspace=ws, scan_only=False)
+                    converted += 1
+            except Exception:
+                pass
+        set_status(conn_status, f"\u2713 Converted {converted}/{len(legacy)} reports.", "#34c759")
+        convert_all_btn.disabled = False
+        convert_all_btn.description = "\u26A1 Convert All Legacy"
+        # Refresh overview
+        _on_format_overview(None)
+
+    format_btn.on_click(_on_format_overview)
+    convert_all_btn.on_click(_on_convert_all)
+
+    format_row = widgets.HBox(
+        [format_btn, convert_all_btn],
+        layout=widgets.Layout(align_items="center", gap="8px", margin="4px 0 0 0"),
+    )
+
+    widget = widgets.VBox([nav_row, action_row, tree_header, panels, format_row, format_container], layout=widgets.Layout(padding="12px", gap="4px"))
     return widget, on_load
