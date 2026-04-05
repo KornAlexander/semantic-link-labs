@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.175"
+__version__ = "1.2.176"
 
 import ipywidgets as widgets
 import io
@@ -2177,6 +2177,7 @@ def pbi_fixer(
     report: Optional[str | UUID] = None,
     page_name: Optional[str] = None,
     show_fixer_tab: bool = False,
+    all_tabs: bool = False,
 ):
     """
     Launches an interactive UI for scanning and fixing Power BI report visuals.
@@ -2195,6 +2196,16 @@ def pbi_fixer(
     show_fixer_tab : bool, default=False
         If True, shows the Fixer tab. By default hidden since all fixers
         are accessible via action dropdowns in the Report and SM tabs.
+    all_tabs : bool, default=False
+        If False (default), only shows Semantic Model, Report, and About tabs for fast startup.
+        If True, shows all tabs (Perspectives, Translations, Memory Analyzer, BPA, etc.).
+
+    Examples
+    --------
+    >>> pbi_fixer()                              # Minimal: SM + Report + About
+    >>> pbi_fixer(all_tabs=True)                 # All tabs
+    >>> pbi_fixer("", "Bad Report")              # SM + Report, pre-filled report name
+    >>> pbi_fixer(all_tabs=True, report="Sales") # All tabs, pre-filled report
     """
 
     # ---------------------------------------------------------------------------
@@ -2742,16 +2753,16 @@ def pbi_fixer(
         _tab_options.append("\U0001F4C4 Report")
     if _fixer_visible:
         _tab_options.append("\u26A1 Fixer")
-    if perspective_editor_tab is not None:
-        _tab_options.append("\U0001F441 Perspectives")
-    _tab_options.append("\U0001F310 Translations")
-    _tab_options.append("\U0001F4BE Memory Analyzer")
-    _tab_options.append("\U0001F4CB BPA")
-    _tab_options.append("\U0001F4C4 Report BPA")
-    _tab_options.append("\U0001F4D0 Delta Analyzer")
-    _tab_options.append("\U0001F4D0 Prototype")
-    _tab_options.append("\U0001F5FA Model Diagram")
-    # _tab_options.append("\u2699\ufe0f Script Runner")  # disabled for now
+    if all_tabs:
+        if perspective_editor_tab is not None:
+            _tab_options.append("\U0001F441 Perspectives")
+        _tab_options.append("\U0001F310 Translations")
+        _tab_options.append("\U0001F4BE Memory Analyzer")
+        _tab_options.append("\U0001F4CB BPA")
+        _tab_options.append("\U0001F4C4 Report BPA")
+        _tab_options.append("\U0001F4D0 Delta Analyzer")
+        _tab_options.append("\U0001F4D0 Prototype")
+        _tab_options.append("\U0001F5FA Model Diagram")
     _tab_options.append("\u2139\ufe0f About")
     if not _tab_options:
         _tab_options = ["\u26A1 Fixer"]
@@ -3460,53 +3471,54 @@ def pbi_fixer(
     if _fixer_visible:
         tab_panels.append(fixer_content)
 
-    if perspective_editor_tab is not None:
-        persp_content = perspective_editor_tab(
+    if all_tabs:
+        if perspective_editor_tab is not None:
+            persp_content = perspective_editor_tab(
+                workspace_input=workspace_input, report_input=report_input
+            )
+            tab_panels.append(persp_content)
+
+        # Translations tab
+        trans_content = _translations_tab(
             workspace_input=workspace_input, report_input=report_input
         )
-        tab_panels.append(persp_content)
+        tab_panels.append(trans_content)
 
-    # Translations tab
-    trans_content = _translations_tab(
-        workspace_input=workspace_input, report_input=report_input
-    )
-    tab_panels.append(trans_content)
+        # Memory Analyzer tab (renamed from Vertipaq)
+        vp_content = _vertipaq_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(vp_content)
 
-    # Memory Analyzer tab (renamed from Vertipaq)
-    vp_content = _vertipaq_tab(
-        workspace_input=workspace_input, report_input=report_input
-    )
-    tab_panels.append(vp_content)
+        # BPA tab
+        bpa_content = _bpa_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(bpa_content)
 
-    # BPA tab
-    bpa_content = _bpa_tab(
-        workspace_input=workspace_input, report_input=report_input
-    )
-    tab_panels.append(bpa_content)
+        # Report BPA tab
+        rpt_bpa_content = _report_bpa_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(rpt_bpa_content)
 
-    # Report BPA tab
-    rpt_bpa_content = _report_bpa_tab(
-        workspace_input=workspace_input, report_input=report_input
-    )
-    tab_panels.append(rpt_bpa_content)
+        # Delta Analyzer tab
+        da_content = _delta_analyzer_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(da_content)
 
-    # Delta Analyzer tab
-    da_content = _delta_analyzer_tab(
-        workspace_input=workspace_input, report_input=report_input
-    )
-    tab_panels.append(da_content)
+        # Prototype tab
+        proto_content = _prototype_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(proto_content)
 
-    # Prototype tab
-    proto_content = _prototype_tab(
-        workspace_input=workspace_input, report_input=report_input
-    )
-    tab_panels.append(proto_content)
-
-    # Model Diagram tab
-    diagram_content = _diagram_tab(
-        workspace_input=workspace_input, report_input=report_input
-    )
-    tab_panels.append(diagram_content)
+        # Model Diagram tab
+        diagram_content = _diagram_tab(
+            workspace_input=workspace_input, report_input=report_input
+        )
+        tab_panels.append(diagram_content)
 
     # Script Runner tab (disabled for now)
     # script_content = _script_tab(
