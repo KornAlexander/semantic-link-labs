@@ -124,9 +124,30 @@ def generate_report_prototype(
                     except Exception:
                         pass
 
-        # Redirect stdout globally to suppress export_report print spam
+        # Redirect stdout AND suppress IPython.display to prevent notebook output overflow
         _real_stdout = sys.stdout
         sys.stdout = _io.StringIO()
+
+        # Monkey-patch IPython display to a no-op during exports
+        _ipd = None
+        _ipd_orig = None
+        _idf = None
+        _idf_orig = None
+        try:
+            import IPython.display as _ipd_mod
+            _ipd = _ipd_mod
+            _ipd_orig = _ipd_mod.display
+            _ipd_mod.display = lambda *a, **kw: None
+        except Exception:
+            pass
+        try:
+            import IPython.core.display_functions as _idf_mod
+            _idf = _idf_mod
+            _idf_orig = _idf_mod.display
+            _idf_mod.display = lambda *a, **kw: None
+        except Exception:
+            pass
+
         try:
             if on_progress:
                 on_progress(0, total_pages, "starting exports...")
@@ -137,6 +158,10 @@ def generate_report_prototype(
                 t.join()
         finally:
             sys.stdout = _real_stdout
+            if _ipd and _ipd_orig:
+                _ipd.display = _ipd_orig
+            if _idf and _idf_orig:
+                _idf.display = _idf_orig
 
     # 3. Build diagram
     svg_str, excalidraw_str = _build_diagram(
