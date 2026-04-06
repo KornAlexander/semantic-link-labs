@@ -44,6 +44,7 @@ from ._items import (
 )
 from sempy_labs._pbi_fixer import (
     pbi_fixer,
+    pbi_fixer_v2,
 )
 
 __all__ = [
@@ -72,4 +73,5 @@ __all__ = [
     "list_reports",
     "get_report",
     "pbi_fixer",
+    "pbi_fixer_v2",
 ]
