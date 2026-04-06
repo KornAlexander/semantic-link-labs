@@ -122,7 +122,8 @@ def add_calculated_calendar(
     relationships : list, default=None
         List of (from_table, from_column, calendar_column) tuples specifying
         relationships to create from fact tables to the calendar table.
-        If None, no relationships are created.
+        If None, auto-detects all Date/DateTime columns not already in a
+        relationship and creates Many→One relationships to CalcCalendar[Date].
 
     Returns
     -------
@@ -225,7 +226,22 @@ def add_calculated_calendar(
             # Set display folder on the hierarchy object
             tom.model.Tables[_CAL_TABLE_NAME].Hierarchies[hier_name].DisplayFolder = folder
 
-        # 7. Create relationships to Date/DateTime columns if specified
+        # 7. Create relationships to Date/DateTime columns
+        #    If relationships=None, auto-detect all Date/DateTime columns not already in a relationship.
+        if relationships is None:
+            relationships = []
+            existing_rels = set()
+            for r in tom.model.Relationships:
+                existing_rels.add((str(r.FromColumn.Table.Name), str(r.FromColumn.Name)))
+            for t in tom.model.Tables:
+                if t.Name == _CAL_TABLE_NAME:
+                    continue
+                for c in t.Columns:
+                    dt = str(c.DataType)
+                    if dt in ("DateTime", "DateTimeOffset"):
+                        if (t.Name, c.Name) not in existing_rels:
+                            relationships.append((t.Name, c.Name, "Date"))
+
         rels_created = 0
         if relationships:
             for from_table, from_column, cal_column in relationships:
