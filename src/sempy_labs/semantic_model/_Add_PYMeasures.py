@@ -102,6 +102,13 @@ def add_py_measures(
             if dest_table_obj is None:
                 print(f"{icons.red_dot} Target table '{target_table}' not found.")
                 return 0
+        else:
+            # Auto-detect measure table by name
+            for t in tom.model.Tables:
+                if "measure" in t.Name.lower():
+                    dest_table_obj = t
+                    print(f"{icons.info} Auto-detected measure table: '{t.Name}'")
+                    break
 
         # Collect source measures
         source_measures = []

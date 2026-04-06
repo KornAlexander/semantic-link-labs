@@ -54,6 +54,13 @@ def add_measures_from_columns(
             if measures_table is None:
                 print(f"{icons.red_dot} Target table '{target_table}' not found.")
                 return 0
+        else:
+            # Auto-detect measure table by name
+            for t in tom.model.Tables:
+                if "measure" in t.Name.lower():
+                    measures_table = t
+                    print(f"{icons.info} Auto-detected measure table: '{t.Name}'")
+                    break
 
         for table in tom.model.Tables:
             for col in table.Columns:
