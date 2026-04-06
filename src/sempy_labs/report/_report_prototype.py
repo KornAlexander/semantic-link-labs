@@ -61,7 +61,46 @@ def generate_report_prototype(
     pages_data = []
     nav_edges = []  # (source_page_name, target_page_name)
     with connect_report(report=report, readonly=True, workspace=workspace) as rw:
-        pages_df = rw.list_pages()
+        try:
+            pages_df = rw.list_pages()
+        except Exception:
+            # Fallback for PBIRLegacy or other issues — parse pages directly from parts
+            import pandas as pd
+            pages_df = pd.DataFrame(columns=["Page Name", "Page Display Name", "Width", "Height",
+                                             "Hidden", "Drillthrough Target Page", "Visual Count", "Data Visual Count"])
+            _fallback_rows = []
+            for part in rw._report_definition.get("parts", []):
+                path = part.get("path", "")
+                if not path.endswith("/page.json"):
+                    continue
+                payload = part.get("payload")
+                if not isinstance(payload, dict):
+                    continue
+                pg_name = payload.get("name", "")
+                is_hidden = payload.get("visibility", "") == "HiddenInViewMode"
+                # Check drillthrough from filterConfig
+                is_dt = False
+                for f in payload.get("filterConfig", {}).get("filters", []):
+                    if f.get("howCreated") == "Drillthrough":
+                        is_dt = True
+                        break
+                # Count visuals for this page
+                page_prefix = path[:-9]  # strip "page.json"
+                v_count = sum(1 for p in rw._report_definition.get("parts", [])
+                              if p.get("path", "").startswith(page_prefix) and p.get("path", "").endswith("/visual.json"))
+                _fallback_rows.append({
+                    "Page Name": pg_name,
+                    "Page Display Name": payload.get("displayName", pg_name),
+                    "Width": payload.get("width", 1280),
+                    "Height": payload.get("height", 720),
+                    "Hidden": is_hidden,
+                    "Drillthrough Target Page": is_dt,
+                    "Visual Count": v_count,
+                    "Data Visual Count": 0,
+                })
+            if _fallback_rows:
+                pages_df = pd.DataFrame(_fallback_rows)
+
         for _, row in pages_df.iterrows():
             pages_data.append({
                 "name": str(row.get("Page Name", "")),
@@ -75,7 +114,25 @@ def generate_report_prototype(
             })
 
         # Extract page navigation from visualLink on all visuals
+        # (cf. https://actionablereporting.com/2026/03/09/power-bi-report-prototyping-with-ai/)
         page_names = {p["name"] for p in pages_data}
+        page_name_lookup = {}  # folder_id -> page_name (in case they differ)
+        for part in rw._report_definition.get("parts", []):
+            path = part.get("path", "")
+            if path.endswith("/page.json"):
+                payload = part.get("payload")
+                if isinstance(payload, dict):
+                    pg_folder = path.replace("\\", "/").split("/")
+                    try:
+                        pi = pg_folder.index("pages")
+                        folder_id = pg_folder[pi + 1]
+                        pg_name = payload.get("name", folder_id)
+                        page_name_lookup[folder_id] = pg_name
+                    except (ValueError, IndexError):
+                        pass
+
+        drillthrough_pages = {p["name"] for p in pages_data if p.get("drillthrough")}
+
         for part in rw._report_definition.get("parts", []):
             path = part.get("path", "")
             if not path.endswith("/visual.json"):
@@ -84,43 +141,51 @@ def generate_report_prototype(
             segments = path.replace("\\", "/").split("/")
             try:
                 pi = segments.index("pages")
-                source_page = segments[pi + 1]
+                folder_id = segments[pi + 1]
             except (ValueError, IndexError):
                 continue
+            source_page = page_name_lookup.get(folder_id, folder_id)
             if source_page not in page_names:
                 continue
-            payload = part.get("payload", {})
-            vis_links = (
-                payload.get("visual", {})
-                .get("visualContainerObjects", {})
-                .get("visualLink", [])
-            )
-            for link in vis_links:
-                props = link.get("properties", {})
-                show_val = (
-                    props.get("show", {})
-                    .get("expr", {})
-                    .get("Literal", {})
-                    .get("Value", "false")
+            payload = part.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            try:
+                vis_links = (
+                    payload.get("visual", {})
+                    .get("visualContainerObjects", {})
+                    .get("visualLink", [])
                 )
-                if show_val != "true":
-                    continue
-                action_type = (
-                    props.get("type", {})
-                    .get("expr", {})
-                    .get("Literal", {})
-                    .get("Value", "")
-                    .strip("'")
-                )
-                target_page = (
-                    props.get("navigationSection", {})
-                    .get("expr", {})
-                    .get("Literal", {})
-                    .get("Value", "")
-                    .strip("'")
-                )
-                if action_type == "PageNavigation" and target_page and target_page in page_names:
-                    nav_edges.append((source_page, target_page))
+                for link in vis_links:
+                    props = link.get("properties", {})
+                    show_val = (
+                        props.get("show", {})
+                        .get("expr", {})
+                        .get("Literal", {})
+                        .get("Value", "false")
+                    )
+                    if show_val != "true":
+                        continue
+                    action_type = (
+                        props.get("type", {})
+                        .get("expr", {})
+                        .get("Literal", {})
+                        .get("Value", "")
+                        .strip("'")
+                    )
+                    target_page = (
+                        props.get("navigationSection", {})
+                        .get("expr", {})
+                        .get("Literal", {})
+                        .get("Value", "")
+                        .strip("'")
+                    )
+                    # Resolve target page name if it's a folder ID
+                    target_page = page_name_lookup.get(target_page, target_page)
+                    if action_type == "PageNavigation" and target_page and target_page in page_names:
+                        nav_edges.append((source_page, target_page))
+            except Exception:
+                continue  # skip visuals with unexpected payload structure
 
     if not pages_data:
         return {"svg": "", "excalidraw": "", "pages": [], "screenshots": 0, "errors": ["No pages found"]}
@@ -245,7 +310,10 @@ def generate_report_prototype(
         nav_edges,
     )
 
-    print(f"\u2713 Prototype: {len(pages_data)} pages, {len(page_images)} screenshots.")
+    print(f"\u2713 Prototype: {len(pages_data)} pages, {len(page_images)} screenshots, {len(nav_edges)} nav links.")
+    dt_count = sum(1 for p in pages_data if p.get("drillthrough"))
+    if dt_count:
+        print(f"  \u2192 {dt_count} drillthrough target page(s)")
     if export_errors:
         for err in export_errors[:3]:
             print(f"  \u26a0 {err}")
