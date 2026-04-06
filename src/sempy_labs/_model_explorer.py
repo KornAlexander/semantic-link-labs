@@ -1591,7 +1591,8 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
                 if len(items) > 1:
                     set_status(conn_status, f"Running {action} on '{item}' ({i+1}/{len(items)})\u2026", GRAY_COLOR)
                 buf = _io.StringIO()
-                kwargs = {"report": item, "workspace": ws, "scan_only": False}
+                kwargs = {"report": item, "workspace": ws, "scan_only": False,
+                          "selected_keys": list(_selected_keys), "model_data": _model_data}
                 if sel_measures and action in ("Add PY Measures (Y-1)",):
                     kwargs["measures"] = sel_measures
                 if sel_columns and action in ("Auto-Create Measures from Columns",):
