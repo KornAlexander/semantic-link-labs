@@ -26,6 +26,8 @@ def export_report(
     workspace: Optional[str | UUID] = None,
     lakehouse: Optional[str | UUID] = None,
     lakehouse_workspace: Optional[str | UUID] = None,
+    _report_id: Optional[str] = None,
+    _return_bytes: bool = False,
 ):
     """
     Exports a Power BI report to a file in your lakehouse.
@@ -110,18 +112,22 @@ def export_report(
     else:
         file_name = f"{file_name}{file_ext}"
 
-    dfI = fabric.list_items(workspace=workspace)
-    dfI_filt = dfI[
-        (dfI["Type"].isin(["Report", "PaginatedReport"]))
-        & (dfI["Display Name"] == report)
-    ]
+    if _report_id is not None:
+        reportId = _report_id
+        report_type = "Report"
+    else:
+        dfI = fabric.list_items(workspace=workspace)
+        dfI_filt = dfI[
+            (dfI["Type"].isin(["Report", "PaginatedReport"]))
+            & (dfI["Display Name"] == report)
+        ]
 
-    if dfI_filt.empty:
-        raise ValueError(
-            f"{icons.red_dot} The '{report}' report does not exist in the '{workspace_name}' workspace."
-        )
+        if dfI_filt.empty:
+            raise ValueError(
+                f"{icons.red_dot} The '{report}' report does not exist in the '{workspace_name}' workspace."
+            )
 
-    report_type = dfI_filt["Type"].iloc[0]
+        report_type = dfI_filt["Type"].iloc[0]
 
     # Limitations
     pbiOnly = ["PNG"]
@@ -156,7 +162,8 @@ def export_report(
             f"{icons.red_dot} Export for paginated reports does not support bookmarks/pages/visuals. Those parameters must not be set for paginated reports."
         )
 
-    reportId = dfI_filt["Id"].iloc[0]
+    if _report_id is None:
+        reportId = dfI_filt["Id"].iloc[0]
 
     if (
         export_format in ["BMP", "EMF", "GIF", "JPEG", "TIFF"]
@@ -230,8 +237,10 @@ def export_report(
         request=get_status_url, status_codes=[200, 202], client="fabric_sp"
     )
     response_body = json.loads(response.content)
+    _poll_interval = 1
     while response_body["status"] not in ["Succeeded", "Failed"]:
-        time.sleep(3)
+        time.sleep(_poll_interval)
+        _poll_interval = min(_poll_interval + 1, 3)
         response = _base_api(
             request=get_status_url, status_codes=[200, 202], client="fabric_sp"
         )
@@ -242,6 +251,10 @@ def export_report(
         )
     else:
         response = _base_api(request=f"{get_status_url}/file", client="fabric_sp")
+
+        if _return_bytes:
+            return response.content
+
         print(
             f"{icons.in_progress} Saving the '{export_format}' export for the '{report}' report within the '{workspace_name}' workspace to the lakehouse..."
         )
