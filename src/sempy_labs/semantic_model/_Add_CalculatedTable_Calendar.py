@@ -10,6 +10,7 @@ from sempy_labs._helper_functions import (
     resolve_dataset_from_report,
 )
 from sempy_labs.tom import connect_semantic_model
+from sempy_labs._refresh_semantic_model import refresh_semantic_model
 
 # ---------------------------------------------------------------------------
 # The full DAX expression for the calculated calendar table.
@@ -271,6 +272,16 @@ def add_calculated_calendar(
             f"'{dataset_name}' with {len(_COLUMNS)} columns, "
             f"{len(_HIERARCHIES)} hierarchies{rel_msg}."
         )
+
+    # Refresh to populate the calculated table data
+    print(f"{icons.in_progress} Refreshing CalcCalendar table...")
+    refresh_semantic_model(
+        dataset=dataset_id,
+        tables=[_CAL_TABLE_NAME],
+        refresh_type="calculate",
+        workspace=dataset_workspace_id,
+    )
+    print(f"{icons.green_dot} CalcCalendar table refreshed.")
 
 # Sample usage:
 # add_calculated_calendar(report="My Report")
