@@ -1598,7 +1598,11 @@ def model_explorer_tab(workspace_input=None, report_input=None, fixer_callbacks=
                     kwargs["columns"] = sel_columns
                 try:
                     with _redirect(buf):
-                        fixer_callbacks[action](**kwargs)
+                        result = fixer_callbacks[action](**kwargs)
+                    # If callback returns a widget, show it in scan_results_box
+                    if result is not None and hasattr(result, 'children'):
+                        scan_results_box.children = [result]
+                        scan_results_box.layout.display = ""
                     succeeded += 1
                 except Exception as e:
                     failed += 1

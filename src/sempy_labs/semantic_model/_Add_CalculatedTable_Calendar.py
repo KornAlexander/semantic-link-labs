@@ -100,12 +100,13 @@ def add_calculated_calendar(
     report: str | UUID,
     workspace: Optional[str | UUID] = None,
     scan_only: bool = False,
+    relationships: Optional[list] = None,
 ) -> None:
     """
     Checks whether a calendar table (DataCategory = 'Time') exists in the
     semantic model that backs the given report. If none is found, adds the
     CalcCalendar calculated table with a full set of date-intelligence columns
-    and hierarchies.
+    and hierarchies. Optionally creates relationships to Date/DateTime columns.
 
     Parameters
     ----------
@@ -118,6 +119,10 @@ def add_calculated_calendar(
     scan_only : bool, default=False
         If True, only reports whether a Time-category table exists without
         making any changes.
+    relationships : list, default=None
+        List of (from_table, from_column, calendar_column) tuples specifying
+        relationships to create from fact tables to the calendar table.
+        If None, no relationships are created.
 
     Returns
     -------
@@ -220,10 +225,35 @@ def add_calculated_calendar(
             # Set display folder on the hierarchy object
             tom.model.Tables[_CAL_TABLE_NAME].Hierarchies[hier_name].DisplayFolder = folder
 
+        # 7. Create relationships to Date/DateTime columns if specified
+        rels_created = 0
+        if relationships:
+            for from_table, from_column, cal_column in relationships:
+                try:
+                    tom.add_relationship(
+                        from_table=from_table,
+                        from_column=from_column,
+                        to_table=_CAL_TABLE_NAME,
+                        to_column=cal_column,
+                        from_cardinality="Many",
+                        to_cardinality="One",
+                    )
+                    rels_created += 1
+                    print(
+                        f"{icons.green_dot} Created relationship: "
+                        f"'{from_table}'[{from_column}] → '{_CAL_TABLE_NAME}'[{cal_column}]"
+                    )
+                except Exception as e:
+                    print(
+                        f"{icons.yellow_dot} Could not create relationship "
+                        f"'{from_table}'[{from_column}] → '{_CAL_TABLE_NAME}'[{cal_column}]: {e}"
+                    )
+
+        rel_msg = f" and {rels_created} relationship(s)" if rels_created else ""
         print(
             f"{icons.green_dot} CalcCalendar table added successfully to "
-            f"'{dataset_name}' with {len(_COLUMNS)} columns and "
-            f"{len(_HIERARCHIES)} hierarchies."
+            f"'{dataset_name}' with {len(_COLUMNS)} columns, "
+            f"{len(_HIERARCHIES)} hierarchies{rel_msg}."
         )
 
 # Sample usage:
