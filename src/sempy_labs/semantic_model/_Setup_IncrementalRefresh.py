@@ -96,38 +96,41 @@ def setup_incremental_refresh(
                 return
             if idx == 0:
                 text = p.Source.Expression.rstrip()
-                # Find the last "in\n  <identifier>" pattern
-                pattern = r"in\s+(\S.*?)$"
-                match = re.search(pattern, text, re.DOTALL)
-                if not match:
-                    print(f"  Could not parse M-partition expression for '{table_name}'. Skipping.")
-                    return
-                # obj = the step name that "in" currently returns (e.g. #"Step2")
-                obj = match.group(1).strip()
-                # text_before = everything before "in ..." (ends with the last step + comma)
-                text_before = text[:match.start()].rstrip()
-                # Ensure text_before ends with a comma (the last step needs one)
-                if not text_before.endswith(","):
-                    text_before += ","
-                # Build new expression: append filter step, then "in" returning the filter step
-                new_step = (
-                    f'\n    #"Filtered Rows IR" = Table.SelectRows({obj}, '
-                    f'each [{date_col}] >= RangeStart and [{date_col}] <= RangeEnd)'
-                )
-                p.Source.Expression = f'{text_before}{new_step}\nin\n    #"Filtered Rows IR"'
+                # Skip if already has the IR filter step
+                if '#"Filtered Rows IR"' in text:
+                    print(f"  M expression already contains IR filter step. Skipping expression edit.")
+                else:
+                    # Find the last "in\n  <identifier>" pattern
+                    pattern = r"in\s+(\S.*?)$"
+                    match = re.search(pattern, text, re.DOTALL)
+                    if not match:
+                        print(f"  Could not parse M-partition expression for '{table_name}'. Skipping.")
+                        return
+                    obj = match.group(1).strip()
+                    text_before = text[:match.start()].rstrip()
+                    if not text_before.endswith(","):
+                        text_before += ","
+                    new_step = (
+                        f'\n    #"Filtered Rows IR" = Table.SelectRows({obj}, '
+                        f'each [{date_col}] >= RangeStart and [{date_col}] <= RangeEnd)'
+                    )
+                    p.Source.Expression = f'{text_before}{new_step}\nin\n    #"Filtered Rows IR"'
 
-        # Add RangeStart / RangeEnd expressions
+        # Add RangeStart / RangeEnd expressions (skip if they already exist)
         date_fmt = "%m/%d/%Y"
         ds = datetime.strptime(start_date, date_fmt)
         de = datetime.strptime(end_date, date_fmt)
-        tom.add_expression(
-            name="RangeStart",
-            expression=f'datetime({ds.year}, {ds.month}, {ds.day}, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]',
-        )
-        tom.add_expression(
-            name="RangeEnd",
-            expression=f'datetime({de.year}, {de.month}, {de.day}, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]',
-        )
+        existing_exprs = {str(e.Name) for e in tom.model.Expressions}
+        if "RangeStart" not in existing_exprs:
+            tom.add_expression(
+                name="RangeStart",
+                expression=f'datetime({ds.year}, {ds.month}, {ds.day}, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]',
+            )
+        if "RangeEnd" not in existing_exprs:
+            tom.add_expression(
+                name="RangeEnd",
+                expression=f'datetime({de.year}, {de.month}, {de.day}, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]',
+            )
 
         # Set refresh policy
         rp = TOM.BasicRefreshPolicy()
