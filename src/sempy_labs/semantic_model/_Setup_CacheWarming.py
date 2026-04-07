@@ -229,11 +229,26 @@ def setup_cache_warming(
         print(f"{icons.yellow_dot} Could not resolve notebook ID — schedule not created. Please schedule manually.")
         return
 
+    # Detect the correct job type for notebooks
+    _job_type = None
+    try:
+        jt_resp = _base_api(
+            request=f"/v1/workspaces/{workspace_id}/items/{nb_id}/jobs",
+            method="get",
+        )
+        job_types = jt_resp.json().get("value", [])
+        if job_types:
+            _job_type = job_types[0].get("jobType", None)
+    except Exception:
+        pass
+    if not _job_type:
+        _job_type = "RunNotebook"
+
     # Check for existing schedules
     schedule_exists = False
     try:
         sched_resp = _base_api(
-            request=f"/v1/workspaces/{workspace_id}/items/{nb_id}/jobs/DefaultJob/schedules",
+            request=f"/v1/workspaces/{workspace_id}/items/{nb_id}/jobs/{_job_type}/schedules",
             method="get",
         )
         schedules = sched_resp.json().get("value", [])
@@ -256,7 +271,7 @@ def setup_cache_warming(
         }
         try:
             resp = _base_api(
-                request=f"/v1/workspaces/{workspace_id}/items/{nb_id}/jobs/DefaultJob/schedules",
+                request=f"/v1/workspaces/{workspace_id}/items/{nb_id}/jobs/{_job_type}/schedules",
                 method="post",
                 payload=schedule_payload,
                 status_codes=[201, 200],
