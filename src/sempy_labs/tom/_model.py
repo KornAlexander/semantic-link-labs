@@ -4038,26 +4038,22 @@ class TOMWrapper:
                 )
 
             elif i == 0:
-                text = p.Source.Expression
-                text = text.rstrip()
+                text = p.Source.Expression.rstrip()
 
-                ind = text.rfind(" ") + 1
-                obj = text[ind:]
-                pattern = r"in\s*[^ ]*"
-                matches = list(re.finditer(pattern, text))
-
-                if matches:
-                    last_match = matches[-1]
-                    text_before_last_match = text[: last_match.start()]
-
-                    print(text_before_last_match)
-                else:
+                # Find the last "in <identifier>" block
+                match = re.search(r"in\s+(\S.*?)$", text, re.DOTALL)
+                if not match:
                     raise ValueError(f"{icons.red_dot} Invalid M-partition expression.")
 
-                endExpr = f'#"Filtered Rows IR" = Table.SelectRows({obj}, each [{column_name}] >= RangeStart and [{column_name}] <= RangeEnd)\n#"Filtered Rows IR"'
-                finalExpr = text_before_last_match + endExpr
-
-                p.Source.Expression = finalExpr
+                obj = match.group(1).strip()
+                text_before = text[:match.start()].rstrip()
+                if not text_before.endswith(","):
+                    text_before += ","
+                new_step = (
+                    f'\n    #"Filtered Rows IR" = Table.SelectRows({obj}, '
+                    f'each [{column_name}] >= RangeStart and [{column_name}] <= RangeEnd)'
+                )
+                p.Source.Expression = f'{text_before}{new_step}\nin\n    #"Filtered Rows IR"'
             i += 1
 
         # Add expressions

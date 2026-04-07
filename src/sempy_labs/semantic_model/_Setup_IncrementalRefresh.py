@@ -96,20 +96,25 @@ def setup_incremental_refresh(
                 return
             if idx == 0:
                 text = p.Source.Expression.rstrip()
-                pattern = r"in\s*[^ ]*"
-                matches = list(re.finditer(pattern, text))
-                if not matches:
+                # Find the last "in\n  <identifier>" pattern
+                pattern = r"in\s+(\S.*?)$"
+                match = re.search(pattern, text, re.DOTALL)
+                if not match:
                     print(f"  Could not parse M-partition expression for '{table_name}'. Skipping.")
                     return
-                last_match = matches[-1]
-                text_before = text[:last_match.start()]
-                obj = text[text.rfind(" ") + 1:]
-                end_expr = (
-                    f'#"Filtered Rows IR" = Table.SelectRows({obj}, '
-                    f'each [{date_col}] >= RangeStart and [{date_col}] <= RangeEnd)\n'
-                    f'#"Filtered Rows IR"'
+                # obj = the step name that "in" currently returns (e.g. #"Step2")
+                obj = match.group(1).strip()
+                # text_before = everything before "in ..." (ends with the last step + comma)
+                text_before = text[:match.start()].rstrip()
+                # Ensure text_before ends with a comma (the last step needs one)
+                if not text_before.endswith(","):
+                    text_before += ","
+                # Build new expression: append filter step, then "in" returning the filter step
+                new_step = (
+                    f'\n    #"Filtered Rows IR" = Table.SelectRows({obj}, '
+                    f'each [{date_col}] >= RangeStart and [{date_col}] <= RangeEnd)'
                 )
-                p.Source.Expression = text_before + end_expr
+                p.Source.Expression = f'{text_before}{new_step}\nin\n    #"Filtered Rows IR"'
 
         # Add RangeStart / RangeEnd expressions
         date_fmt = "%m/%d/%Y"
