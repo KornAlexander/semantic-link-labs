@@ -121,8 +121,9 @@ def setup_cache_warming(
 
         if persp_exists:
             # Remove old perspective, recreate fresh
-            old = tom.model.Perspectives[_PERSPECTIVE_NAME]
-            tom.model.Perspectives.Remove(old)
+            old = tom.model.Perspectives.Find(_PERSPECTIVE_NAME)
+            if old is not None:
+                tom.model.Perspectives.Remove(old)
             print(f"\n{icons.info} Existing '{_PERSPECTIVE_NAME}' perspective updated.")
         else:
             print(f"\n{icons.green_dot} Creating '{_PERSPECTIVE_NAME}' perspective...")
@@ -134,30 +135,33 @@ def setup_cache_warming(
         tom.model.Perspectives.Add(persp)
 
         # Add all resident + relationship columns
-        all_cols = list(existing) | set(extra_rel) if extra_rel else existing
         all_cols = existing.union(set(extra_rel))
 
-        tables_added = set()
+        tables_added = {}  # table_name -> PerspectiveTable object
         for table_name, col_name in sorted(all_cols):
             # Ensure PerspectiveTable exists
             if table_name not in tables_added:
                 try:
-                    table_obj = tom.model.Tables[table_name]
+                    table_obj = tom.model.Tables.Find(table_name)
+                    if table_obj is None:
+                        continue
                 except Exception:
                     continue
                 pt = TOM.PerspectiveTable()
                 pt.Table = table_obj
-                tom.model.Perspectives[_PERSPECTIVE_NAME].PerspectiveTables.Add(pt)
-                tables_added.add(table_name)
+                persp.PerspectiveTables.Add(pt)
+                tables_added[table_name] = pt
 
             # Add column
             try:
-                col_obj = tom.model.Tables[table_name].Columns[col_name]
+                pt_ref = tables_added[table_name]
+                table_obj = tom.model.Tables.Find(table_name)
+                col_obj = table_obj.Columns.Find(col_name) if table_obj else None
+                if col_obj is None:
+                    continue
                 pc = TOM.PerspectiveColumn()
                 pc.Column = col_obj
-                tom.model.Perspectives[_PERSPECTIVE_NAME].PerspectiveTables[
-                    table_name
-                ].PerspectiveColumns.Add(pc)
+                pt_ref.PerspectiveColumns.Add(pc)
             except Exception:
                 pass
 
