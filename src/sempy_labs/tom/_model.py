@@ -4038,7 +4038,7 @@ class TOMWrapper:
                 )
 
             elif i == 0:
-                text = p.Expression
+                text = p.Source.Expression
                 text = text.rstrip()
 
                 ind = text.rfind(" ") + 1
@@ -4057,7 +4057,7 @@ class TOMWrapper:
                 endExpr = f'#"Filtered Rows IR" = Table.SelectRows({obj}, each [{column_name}] >= RangeStart and [{column_name}] <= RangeEnd)\n#"Filtered Rows IR"'
                 finalExpr = text_before_last_match + endExpr
 
-                p.Expression = finalExpr
+                p.Source.Expression = finalExpr
             i += 1
 
         # Add expressions
