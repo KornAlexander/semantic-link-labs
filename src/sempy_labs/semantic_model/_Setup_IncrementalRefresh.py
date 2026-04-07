@@ -65,9 +65,12 @@ def setup_incremental_refresh(
             return
 
         # Check if already has refresh policy
-        if t.EnableRefreshPolicy:
-            print(f"  Table '{table_name}' already has an incremental refresh policy. Skipping.")
-            return
+        try:
+            if t.RefreshPolicy is not None:
+                print(f"  Table '{table_name}' already has an incremental refresh policy. Skipping.")
+                return
+        except Exception:
+            pass
 
         # Dates
         end_date = datetime.now().strftime("%m/%d/%Y")
