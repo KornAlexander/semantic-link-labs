@@ -46,7 +46,10 @@ def setup_incremental_refresh(
     with connect_semantic_model(dataset=dataset, readonly=scan_only, workspace=workspace) as tom:
         import Microsoft.AnalysisServices.Tabular as TOM
 
-        t = tom.model.Tables[table_name]
+        t = tom.model.Tables.Find(table_name)
+        if t is None:
+            print(f"  Table '{table_name}' not found. Skipping.")
+            return
 
         # Auto-detect date column
         date_col = column_name
@@ -60,7 +63,10 @@ def setup_incremental_refresh(
                 return
 
         # Verify column type
-        c = t.Columns[date_col]
+        c = t.Columns.Find(date_col)
+        if c is None:
+            print(f"  Column '{date_col}' not found in '{table_name}'. Skipping.")
+            return
         if c.DataType != TOM.DataType.DateTime:
             print(f"  Column '{date_col}' is not DateTime ({c.DataType}). Skipping.")
             return
@@ -138,7 +144,8 @@ def setup_incremental_refresh(
         rp.IncrementalGranularity = System.Enum.Parse(TOM.RefreshGranularityType, "Day")
         rp.RollingWindowPeriods = rolling_window_years
         rp.RollingWindowGranularity = System.Enum.Parse(TOM.RefreshGranularityType, "Year")
-        rp.SourceExpression = t.Partitions[0].Source.Expression
+        first_partition = t.Partitions[0] if t.Partitions.Count > 0 else None
+        rp.SourceExpression = first_partition.Source.Expression if first_partition else ""
         if only_refresh_complete_days:
             rp.IncrementalPeriodsOffset = -1
         t.RefreshPolicy = rp
