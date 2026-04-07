@@ -244,7 +244,7 @@ def setup_cache_warming(
         pass
 
     if not schedule_exists:
-        tomorrow = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%dT00:00:00")
+        tomorrow = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
         schedule_payload = {
             "enabled": True,
             "configuration": {
@@ -255,15 +255,23 @@ def setup_cache_warming(
             },
         }
         try:
-            _base_api(
+            resp = _base_api(
                 request=f"/v1/workspaces/{workspace_id}/items/{nb_id}/jobs/DefaultJob/schedules",
                 method="post",
                 payload=schedule_payload,
-                status_codes=201,
+                status_codes=[201, 200],
             )
             print(f"{icons.green_dot} Scheduled '{nb_name}' daily at 07:00 (W. Europe Standard Time).")
         except Exception as e:
+            err_detail = ""
+            if hasattr(e, "response") and e.response is not None:
+                try:
+                    err_detail = e.response.json().get("message", e.response.text[:200])
+                except Exception:
+                    err_detail = str(e.response.status_code)
             print(f"{icons.yellow_dot} Could not create schedule: {e}")
+            if err_detail:
+                print(f"   Detail: {err_detail}")
             print(f"   Please schedule the notebook manually in the Fabric UI.")
     else:
         print(f"{icons.info} Schedule already exists for '{nb_name}' — skipping.")
