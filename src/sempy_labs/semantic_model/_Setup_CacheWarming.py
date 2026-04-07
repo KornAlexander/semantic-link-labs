@@ -243,11 +243,13 @@ def setup_cache_warming(
 
     if not schedule_exists:
         tomorrow = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
+        far_future = "2099-12-31T23:59:59Z"
         schedule_payload = {
             "enabled": True,
             "configuration": {
                 "type": "Daily",
                 "startDateTime": tomorrow,
+                "endDateTime": far_future,
                 "localTimeZoneId": "W. Europe Standard Time",
                 "times": ["07:00"],
             },
