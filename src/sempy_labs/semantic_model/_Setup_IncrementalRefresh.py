@@ -4,6 +4,7 @@
 from typing import Optional
 from uuid import UUID
 from datetime import datetime, timedelta
+import re
 
 
 def setup_incremental_refresh(
@@ -85,16 +86,54 @@ def setup_incremental_refresh(
             print(f"    Range: {start_date} - {end_date}")
             return
 
-        tom.add_incremental_refresh_policy(
-            table_name=table_name,
-            column_name=date_col,
-            start_date=start_date,
-            end_date=end_date,
-            incremental_granularity="Day",
-            incremental_periods=incremental_days,
-            rolling_window_granularity="Year",
-            rolling_window_periods=rolling_window_years,
-            only_refresh_complete_days=only_refresh_complete_days,
+        import System
+
+        # Inline incremental refresh setup (bypasses tom.add_incremental_refresh_policy
+        # which has a bug using p.Expression instead of p.Source.Expression)
+        for idx, p in enumerate(t.Partitions):
+            if p.SourceType != TOM.PartitionSourceType.M:
+                print(f"  Partition '{p.Name}' is not M-partition ({p.SourceType}). Skipping table.")
+                return
+            if idx == 0:
+                text = p.Source.Expression.rstrip()
+                pattern = r"in\s*[^ ]*"
+                matches = list(re.finditer(pattern, text))
+                if not matches:
+                    print(f"  Could not parse M-partition expression for '{table_name}'. Skipping.")
+                    return
+                last_match = matches[-1]
+                text_before = text[:last_match.start()]
+                obj = text[text.rfind(" ") + 1:]
+                end_expr = (
+                    f'#"Filtered Rows IR" = Table.SelectRows({obj}, '
+                    f'each [{date_col}] >= RangeStart and [{date_col}] <= RangeEnd)\n'
+                    f'#"Filtered Rows IR"'
+                )
+                p.Source.Expression = text_before + end_expr
+
+        # Add RangeStart / RangeEnd expressions
+        date_fmt = "%m/%d/%Y"
+        ds = datetime.strptime(start_date, date_fmt)
+        de = datetime.strptime(end_date, date_fmt)
+        tom.add_expression(
+            name="RangeStart",
+            expression=f'datetime({ds.year}, {ds.month}, {ds.day}, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]',
         )
+        tom.add_expression(
+            name="RangeEnd",
+            expression=f'datetime({de.year}, {de.month}, {de.day}, 0, 0, 0) meta [IsParameterQuery=true, Type="DateTime", IsParameterQueryRequired=true]',
+        )
+
+        # Set refresh policy
+        rp = TOM.BasicRefreshPolicy()
+        rp.IncrementalPeriods = incremental_days
+        rp.IncrementalGranularity = System.Enum.Parse(TOM.RefreshGranularityType, "Day")
+        rp.RollingWindowPeriods = rolling_window_years
+        rp.RollingWindowGranularity = System.Enum.Parse(TOM.RefreshGranularityType, "Year")
+        rp.SourceExpression = t.Partitions[0].Source.Expression
+        if only_refresh_complete_days:
+            rp.IncrementalPeriodsOffset = -1
+        t.RefreshPolicy = rp
+
         print(f"  \u2713 Incremental refresh configured on '{table_name}'[{date_col}]")
         print(f"    Rolling window: {rolling_window_years} year(s), Refresh: {incremental_days} day(s)")
