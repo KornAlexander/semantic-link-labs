@@ -96,6 +96,7 @@ def setup_incremental_refresh(
 
         # Inline incremental refresh setup (bypasses tom.add_incremental_refresh_policy
         # which has a bug using p.Expression instead of p.Source.Expression)
+        first_partition_expr = None
         for idx, p in enumerate(t.Partitions):
             if p.SourceType != TOM.PartitionSourceType.M:
                 print(f"  Partition '{p.Name}' is not M-partition ({p.SourceType}). Skipping table.")
@@ -105,6 +106,7 @@ def setup_incremental_refresh(
                 # Skip if already has the IR filter step
                 if '#"Filtered Rows IR"' in text:
                     print(f"  M expression already contains IR filter step. Skipping expression edit.")
+                    first_partition_expr = text
                 else:
                     # Find the last "in\n  <identifier>" pattern
                     pattern = r"in\s+(\S.*?)$"
@@ -121,6 +123,7 @@ def setup_incremental_refresh(
                         f'each [{date_col}] >= RangeStart and [{date_col}] <= RangeEnd)'
                     )
                     p.Source.Expression = f'{text_before}{new_step}\nin\n    #"Filtered Rows IR"'
+                    first_partition_expr = p.Source.Expression
 
         # Add RangeStart / RangeEnd expressions (skip if they already exist)
         date_fmt = "%m/%d/%Y"
@@ -144,8 +147,7 @@ def setup_incremental_refresh(
         rp.IncrementalGranularity = System.Enum.Parse(TOM.RefreshGranularityType, "Day")
         rp.RollingWindowPeriods = rolling_window_years
         rp.RollingWindowGranularity = System.Enum.Parse(TOM.RefreshGranularityType, "Year")
-        first_partition = t.Partitions[0] if t.Partitions.Count > 0 else None
-        rp.SourceExpression = first_partition.Source.Expression if first_partition else ""
+        rp.SourceExpression = first_partition_expr or ""
         if only_refresh_complete_days:
             rp.IncrementalPeriodsOffset = -1
         t.RefreshPolicy = rp
