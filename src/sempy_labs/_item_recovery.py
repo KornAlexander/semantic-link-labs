@@ -14,6 +14,21 @@ import sempy_labs._icons as icons
 
 @log
 def list_recoverable_items(workspace: Optional[str | UUID] = None) -> pd.DataFrame:
+    """
+    Returns a list of `recoverable <https://learn.microsoft.com/fabric/admin/item-recovery>`_ items (soft-deleted items which can be recovered).
+
+    Parameters
+    ----------
+    workspace : str | uuid.UUID, default=None
+        The workspace name or ID.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Shows a list of recoverable items (soft-deleted items which can be recovered).
+    """
 
     workspace_id = resolve_workspace_id(workspace)
 
@@ -83,6 +98,24 @@ def resolve_recoverable_item_id(
 def recover_item(
     item: str | UUID, type: Optional[str] = None, workspace: Optional[str | UUID] = None
 ) -> dict:
+    """
+    Recovers a soft-deleted item in the specified workspace.
+
+    Parameters
+    ----------
+    item : str | uuid.UUID
+        The item name or ID. If specifying the item name, the item type is required.
+    type : str, default=None
+        The item `type <https://learn.microsoft.com/rest/api/fabric/core/items/list-items?tabs=HTTP#itemtype>`_. If specifying the item name as the item, the item type is required.
+    workspace : str | uuid.UUID, default=None
+        The workspace name or ID.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+
+    Returns
+    -------
+    dict
+        The API response as a dictionary.
+    """
 
     (workspace_name, workspace_id, item_id, item_type) = resolve_recoverable_item_id(
         item=item, type=type, workspace=workspace
@@ -103,6 +136,25 @@ def recover_item(
 def permanently_delete_item(
     item: str | UUID, type: Optional[str] = None, workspace: Optional[str | UUID] = None
 ) -> dict:
+    """
+    Permanently deletes a soft-deleted item in the specified workspace. This action cannot be undone.
+
+    Parameters
+    ----------
+    item : str | uuid.UUID
+        The item name or ID. If specifying the item name, the item type is required.
+    type : str, default=None
+        The item `type <https://learn.microsoft.com/rest/api/fabric/core/items/list-items?tabs=HTTP#itemtype>`_. If specifying the item name as the item, the item type is required.
+    workspace : str | uuid.UUID, default=None
+        The workspace name or ID.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
+
+    Returns
+    -------
+    dict
+        The API response as a dictionary.
+    """
 
     (workspace_name, workspace_id, item_id, item_type) = resolve_recoverable_item_id(
         item=item, type=type, workspace=workspace
