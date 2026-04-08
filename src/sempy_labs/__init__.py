@@ -354,8 +354,10 @@ from ._catalog import (
     list_endorsements,
     list_favorites,
 )
+from ._pbi_fixer import pbi_fixer
 
 __all__ = [
+    "pbi_fixer",
     "resolve_warehouse_id",
     "ConnectWarehouse",
     "ConnectLakehouse",
