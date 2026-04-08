@@ -1,7 +1,7 @@
 # Interactive PBI Report Fixer UI (ipywidgets)
 # Orchestrates report visual fixers and semantic model fixers via a single notebook widget.
 
-__version__ = "1.2.318"
+__version__ = "1.2.319"
 
 import ipywidgets as widgets
 import io
@@ -301,9 +301,9 @@ def _translations_tab(workspace_input=None, report_input=None):
             return
         langs = _languages
         col_w_type = "40px"
-        col_w_table = "160px"
-        col_w_name = "180px"
-        col_w_lang = "160px"
+        col_w_table = "200px"
+        col_w_name = "220px"
+        col_w_lang = "200px"
 
         header_style = f"font-size:11px; font-weight:700; font-family:monospace; padding:4px 6px; border-bottom:2px solid {BORDER_COLOR};"
         # Header row
@@ -332,7 +332,7 @@ def _translations_tab(workspace_input=None, report_input=None):
                 txt = widgets.Text(
                     value=val,
                     placeholder=obj_name,
-                    layout=widgets.Layout(width=col_w_lang, height="26px"),
+                    layout=widgets.Layout(width=col_w_lang),
                 )
                 txt._trans_key = key
                 txt._trans_lang = lang
