@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import re
 
 
-def setup_incremental_refresh(
+def add_incremental_refresh(
     dataset: str,
     table_name: str,
     workspace: Optional[str | UUID] = None,

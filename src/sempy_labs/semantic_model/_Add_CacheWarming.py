@@ -20,7 +20,7 @@ _PERSPECTIVE_DESC = (
 )
 
 
-def setup_cache_warming(
+def add_cache_warming(
     dataset: str | UUID,
     workspace: Optional[str | UUID] = None,
     scan_only: bool = False,

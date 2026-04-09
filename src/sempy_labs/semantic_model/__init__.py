@@ -6,8 +6,8 @@ from ._copilot import (
 from ._caching import (
     enable_query_caching,
 )
-from ._Setup_CacheWarming import (
-    setup_cache_warming,
+from ._Add_CacheWarming import (
+    add_cache_warming,
 )
 
 
@@ -16,5 +16,5 @@ __all__ = [
     "set_endorsement",
     "make_discoverable",
     "enable_query_caching",
-    "setup_cache_warming",
+    "add_cache_warming",
 ]
