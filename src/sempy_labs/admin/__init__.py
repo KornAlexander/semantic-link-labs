@@ -51,6 +51,7 @@ from ._tenant import (
     list_capacity_tenant_settings_overrides,
     list_capacities_delegated_tenant_settings,
     list_domain_tenant_settings_overrides,
+    enable_item_recovery,
 )
 from ._basic_functions import (
     assign_workspaces_to_capacity,
@@ -171,4 +172,5 @@ __all__ = [
     "bulk_set_labels",
     "bulk_remove_labels",
     "sync_role_assignments_to_subdomains",
+    "enable_item_recovery",
 ]

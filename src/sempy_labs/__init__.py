@@ -353,8 +353,16 @@ from ._catalog import (
     list_endorsements,
     list_favorites,
 )
+from ._item_recovery import (
+    list_recoverable_items,
+    recover_item,
+    permanently_delete_item,
+)
 
 __all__ = [
+    "list_recoverable_items",
+    "recover_item",
+    "permanently_delete_item",
     "resolve_warehouse_id",
     "ConnectWarehouse",
     "ConnectLakehouse",

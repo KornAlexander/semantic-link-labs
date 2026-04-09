@@ -29,7 +29,7 @@ def list_item_job_instances(
     Parameters
     ----------
     item : str | uuid.UUID
-        The item name or ID
+        The item name or ID.
     type : str, default=None
         The item `type <https://learn.microsoft.com/rest/api/fabric/core/items/list-items?tabs=HTTP#itemtype>`_. If specifying the item name as the item, the item type is required.
     workspace : str | uuid.UUID, default=None
