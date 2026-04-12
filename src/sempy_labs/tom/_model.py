@@ -1612,7 +1612,7 @@ class TOMWrapper:
 
         object.ExtendedProperties.Clear()
 
-    def _valid_perspective_objects():
+    def _valid_perspective_objects(self):
 
         import Microsoft.AnalysisServices.Tabular as TOM
 
@@ -1818,7 +1818,7 @@ class TOMWrapper:
                 object.Parent.Name
             ].PerspectiveHierarchies.Remove(ph)
 
-    def _valid_translation_objects():
+    def _valid_translation_objects(self):
 
         import Microsoft.AnalysisServices.Tabular as TOM
 
@@ -5089,7 +5089,7 @@ class TOMWrapper:
             )
         ]
 
-        for p in tom.model.Perspectives:
+        for p in self.model.Perspectives:
             if p.Name == perspective_name:
                 tables = [pt.Name for pt in p.PerspectiveTables]
                 columns = [
@@ -5100,12 +5100,12 @@ class TOMWrapper:
                 measures = [
                     pm.Name
                     for pt in p.PerspectiveTables
-                    for pc in pt.PerspectiveMeasures
+                    for pm in pt.PerspectiveMeasures
                 ]
                 hierarchies = [
                     f"'{pt.Name}'[{ph.Name}]"
                     for pt in p.PerspectiveTables
-                    for pc in pt.PerspectiveHierarchies
+                    for ph in pt.PerspectiveHierarchies
                 ]
 
         filt = dep_filt[
@@ -5138,13 +5138,14 @@ class TOMWrapper:
 
         def add_to_result(table_name, object_name, object_type, rows):
 
-            return rows.append(
+            rows.append(
                 {
                     "Table Name": table_name,
                     "Object Name": object_name,
                     "Object Type": object_type,
                 }
             )
+            return rows
 
         rows = []
         for _, r in filt.iterrows():
