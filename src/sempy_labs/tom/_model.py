@@ -1612,6 +1612,17 @@ class TOMWrapper:
 
         object.ExtendedProperties.Clear()
 
+    def _valid_perspective_objects(self):
+
+        import Microsoft.AnalysisServices.Tabular as TOM
+
+        return [
+            TOM.ObjectType.Table,
+            TOM.ObjectType.Column,
+            TOM.ObjectType.Measure,
+            TOM.ObjectType.Hierarchy,
+        ]
+
     def in_perspective(
         self,
         object: Union["TOM.Table", "TOM.Column", "TOM.Measure", "TOM.Hierarchy"],
@@ -1634,17 +1645,12 @@ class TOMWrapper:
         """
         import Microsoft.AnalysisServices.Tabular as TOM
 
-        validObjects = [
-            TOM.ObjectType.Table,
-            TOM.ObjectType.Column,
-            TOM.ObjectType.Measure,
-            TOM.ObjectType.Hierarchy,
-        ]
+        valid_objects = self._valid_perspective_objects()
         objectType = object.ObjectType
 
-        if objectType not in validObjects:
+        if objectType not in valid_objects:
             raise ValueError(
-                f"{icons.red_dot} Only the following object types are valid for perspectives: {validObjects}."
+                f"{icons.red_dot} Only the following object types are valid for perspectives: {valid_objects}."
             )
 
         object.Model.Perspectives[perspective_name]
@@ -1690,17 +1696,12 @@ class TOMWrapper:
         """
         import Microsoft.AnalysisServices.Tabular as TOM
 
-        validObjects = [
-            TOM.ObjectType.Table,
-            TOM.ObjectType.Column,
-            TOM.ObjectType.Measure,
-            TOM.ObjectType.Hierarchy,
-        ]
+        valid_objects = self._valid_perspective_objects()
         objectType = object.ObjectType
 
-        if objectType not in validObjects:
+        if objectType not in valid_objects:
             raise ValueError(
-                f"{icons.red_dot} Only the following object types are valid for perspectives: {validObjects}."
+                f"{icons.red_dot} Only the following object types are valid for perspectives: {valid_objects}."
             )
 
         if any(p.Name == perspective_name for p in self.model.Perspectives):
@@ -1710,13 +1711,28 @@ class TOMWrapper:
                 f"{icons.red_dot} The '{perspective_name}' perspective does not exist."
             )
 
+        # Ignore if object is already in the perspective
+        if self.in_perspective(object=object, perspective_name=perspective_name):
+            return
+
+        # Tables
         if objectType == TOM.ObjectType.Table:
             pt = TOM.PerspectiveTable()
             if include_all:
                 pt.IncludeAll = True
             pt.Table = object
             object.Model.Perspectives[perspective_name].PerspectiveTables.Add(pt)
-        elif objectType == TOM.ObjectType.Column:
+        else:
+            # Add the table if it is not in the perspective
+            if not self.in_perspective(
+                object=object.Parent, perspective_name=perspective_name
+            ):
+                pt = TOM.PerspectiveTable()
+                pt.Table = object.Parent
+                object.Model.Perspectives[perspective_name].PerspectiveTables.Add(pt)
+
+        # Columns, Measures, Hierarchies
+        if objectType == TOM.ObjectType.Column:
             pc = TOM.PerspectiveColumn()
             pc.Column = object
             object.Model.Perspectives[perspective_name].PerspectiveTables[
@@ -1752,23 +1768,22 @@ class TOMWrapper:
         """
         import Microsoft.AnalysisServices.Tabular as TOM
 
-        validObjects = [
-            TOM.ObjectType.Table,
-            TOM.ObjectType.Column,
-            TOM.ObjectType.Measure,
-            TOM.ObjectType.Hierarchy,
-        ]
+        valid_objects = self._valid_perspective_objects()
         objectType = object.ObjectType
 
-        if objectType not in validObjects:
+        if objectType not in valid_objects:
             raise ValueError(
-                f"{icons.red_dot} Only the following object types are valid for perspectives: {validObjects}."
+                f"{icons.red_dot} Only the following object types are valid for perspectives: {valid_objects}."
             )
 
         if not any(p.Name == perspective_name for p in self.model.Perspectives):
             raise ValueError(
                 f"{icons.red_dot} The '{perspective_name}' perspective does not exist."
             )
+
+        # Ignore if the object is already not in the perspective
+        if not self.in_perspective(object=object, perspective_name=perspective_name):
+            return
 
         if objectType == TOM.ObjectType.Table:
             pt = object.Model.Perspectives[perspective_name].PerspectiveTables[
@@ -1803,6 +1818,18 @@ class TOMWrapper:
                 object.Parent.Name
             ].PerspectiveHierarchies.Remove(ph)
 
+    def _valid_translation_objects(self):
+
+        import Microsoft.AnalysisServices.Tabular as TOM
+
+        return [
+            TOM.ObjectType.Table,
+            TOM.ObjectType.Column,
+            TOM.ObjectType.Measure,
+            TOM.ObjectType.Hierarchy,
+            TOM.ObjectType.Level,
+        ]
+
     def set_translation(
         self,
         object: Union[
@@ -1832,17 +1859,11 @@ class TOMWrapper:
 
         property = property.title()
 
-        validObjects = [
-            TOM.ObjectType.Table,
-            TOM.ObjectType.Column,
-            TOM.ObjectType.Measure,
-            TOM.ObjectType.Hierarchy,
-            TOM.ObjectType.Level,
-        ]
+        valid_objects = self._valid_translation_objects()
 
-        if object.ObjectType not in validObjects:
+        if object.ObjectType not in valid_objects:
             raise ValueError(
-                f"{icons.red_dot} Translations can only be set to {validObjects}."
+                f"{icons.red_dot} Translations can only be set to {valid_objects}."
             )
 
         mapping = {
@@ -5068,20 +5089,25 @@ class TOMWrapper:
             )
         ]
 
-        tables = dfP[dfP["Object Type"] == "Table"]["Table Name"].tolist()
-        measures = dfP[dfP["Object Type"] == "Measure"]["Object Name"].tolist()
-        columns = dfP[dfP["Object Type"] == "Column"][["Table Name", "Object Name"]]
-        cols = [
-            f"'{row[0]}'[{row[1]}]"
-            for row in columns.itertuples(index=False, name=None)
-        ]
-        hierarchies = dfP[dfP["Object Type"] == "Hierarchy"][
-            ["Table Name", "Object Name"]
-        ]
-        hier = [
-            f"'{row[0]}'[{row[1]}]"
-            for row in hierarchies.itertuples(index=False, name=None)
-        ]
+        for p in self.model.Perspectives:
+            if p.Name == perspective_name:
+                tables = [pt.Name for pt in p.PerspectiveTables]
+                columns = [
+                    f"'{pt.Name}'[{pc.Name}]"
+                    for pt in p.PerspectiveTables
+                    for pc in pt.PerspectiveColumns
+                ]
+                measures = [
+                    pm.Name
+                    for pt in p.PerspectiveTables
+                    for pm in pt.PerspectiveMeasures
+                ]
+                hierarchies = [
+                    f"'{pt.Name}'[{ph.Name}]"
+                    for pt in p.PerspectiveTables
+                    for ph in pt.PerspectiveHierarchies
+                ]
+
         filt = dep_filt[
             (dep_filt["Object Type"].isin(["Rows Allowed", "Calc Item"]))
             | (dep_filt["Object Type"] == "Measure")
@@ -5094,7 +5120,7 @@ class TOMWrapper:
                     dep_filt.apply(
                         lambda row: f"'{row['Table Name']}'[{row['Object Name']}]",
                         axis=1,
-                    ).isin(cols)
+                    ).isin(columns)
                 )
             )
             | (
@@ -5103,25 +5129,25 @@ class TOMWrapper:
                     dep_filt.apply(
                         lambda row: f"'{row['Table Name']}'[{row['Object Name']}]",
                         axis=1,
-                    ).isin(hier)
+                    ).isin(hierarchies)
                 )
             )
         ]
 
         result_df = pd.DataFrame(columns=["Table Name", "Object Name", "Object Type"])
 
-        def add_to_result(table_name, object_name, object_type, dataframe):
+        def add_to_result(table_name, object_name, object_type, rows):
 
-            new_data = {
-                "Table Name": table_name,
-                "Object Name": object_name,
-                "Object Type": object_type,
-            }
-
-            return pd.concat(
-                [dataframe, pd.DataFrame(new_data, index=[0])], ignore_index=True
+            rows.append(
+                {
+                    "Table Name": table_name,
+                    "Object Name": object_name,
+                    "Object Type": object_type,
+                }
             )
+            return rows
 
+        rows = []
         for _, r in filt.iterrows():
             added = False
             obj_type = r["Referenced Object Type"]
@@ -5155,7 +5181,7 @@ class TOMWrapper:
                     )
                     added = True
             if added:
-                result_df = add_to_result(table_name, object_name, obj_type, result_df)
+                rows = add_to_result(table_name, object_name, obj_type, rows)
 
         # Reduce model...
 
@@ -5179,8 +5205,8 @@ class TOMWrapper:
                     object=r.FromColumn, perspective_name=perspective_name
                 )
 
-                result_df = add_to_result(
-                    r.FromTable.Name, r.FromColumn.Name, "Column", result_df
+                rows = add_to_result(
+                    r.FromTable.Name, r.FromColumn.Name, "Column", rows
                 )
             if not self.in_perspective(r.ToColumn, perspective_name=perspective_name):
                 table_name = r.ToTable.Name
@@ -5189,9 +5215,7 @@ class TOMWrapper:
                     object=r.ToColumn, perspective_name=perspective_name
                 )
 
-                result_df = add_to_result(
-                    r.ToTable.Name, r.ToColumn.Name, "Column", result_df
-                )
+                rows = add_to_result(r.ToTable.Name, r.ToColumn.Name, "Column", rows)
 
         # Remove objects not in the perspective
         for t in self.model.Tables:
@@ -5208,7 +5232,11 @@ class TOMWrapper:
                             self.remove_object(object=obj)
 
         # Return the objects added to the perspective based on dependencies
-        return result_df.drop_duplicates()
+        if rows:
+            result_df = pd.DataFrame(rows)
+            result_df.drop_duplicates(inplace=True)
+
+        return result_df
 
     def convert_direct_lake_to_import(
         self,
