@@ -47,7 +47,7 @@ def list_tenant_settings() -> pd.DataFrame:
                 "Enabled": i.get("enabled"),
                 "Can Specify Security Groups": i.get("canSpecifySecurityGroups"),
                 "Tenant Setting Group": i.get("tenantSettingGroup"),
-                "Enabled Security Groups": [i.get("enabledSecurityGroups", [])],
+                "Enabled Security Groups": i.get("enabledSecurityGroups", []),
             }
         )
 

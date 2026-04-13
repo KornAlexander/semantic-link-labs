@@ -71,6 +71,8 @@ def list_workspaces(
         "State": "string",
         "Type": "string",
         "Capacity Id": "string",
+        "Tags": "string",
+        "Domain Id": "string",
     }
     df = _create_dataframe(columns=columns)
 
@@ -92,24 +94,26 @@ def list_workspaces(
     url = _build_url(url, params)
 
     responses = _base_api(request=url, client="fabric_sp", uses_pagination=True)
-    workspaces = []
 
+    if not responses:
+        return df
+
+    rows = []
     for r in responses:
-        workspaces = workspaces + r.get("workspaces", [])
+        for w in r.get("workspaces", []):
+            rows.append({
+                "Id": w.get("id"),
+                "Name": w.get("name"),
+                "State": w.get("state"),
+                "Type": w.get("type"),
+                "Capacity Id": w.get("capacityId"),
+                "Tags": w.get("tags"),
+                "Domain Id": w.get("domainId"),
 
-    if len(workspaces) > 0:
-        df = pd.DataFrame(workspaces)
-        df.rename(
-            columns={
-                "id": "Id",
-                "name": "Name",
-                "state": "State",
-                "type": "Type",
-                "capacityId": "Capacity Id",
-            },
-            inplace=True,
-        )
+            })
 
+    if rows:
+        df = pd.DataFrame(rows, columns=list(columns.keys()))
         df["Capacity Id"] = df["Capacity Id"].str.lower()
 
         if workspace is not None and _is_valid_uuid(workspace):
