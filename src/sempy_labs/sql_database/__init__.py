@@ -4,6 +4,8 @@ from sempy_labs.sql_database._items import (
     create_sql_database,
     delete_sql_database,
     list_sql_databases,
+    revalidate_cmk,
+    list_restorable_deleted_databases,
 )
 from sempy_labs.sql_database._mirroring import (
     start_mirroring,
@@ -18,4 +20,6 @@ __all__ = [
     "list_sql_databases",
     "start_mirroring",
     "stop_mirroring",
+    "revalidate_cmk",
+    "list_restorable_deleted_databases",
 ]
