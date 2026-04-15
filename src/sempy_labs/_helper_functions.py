@@ -1405,7 +1405,7 @@ def resolve_workspace_capacity(
     """
     from sempy_labs._capacities import list_capacities
 
-    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    workspace_id = resolve_workspace_id(workspace)
     filter_condition = urllib.parse.quote(workspace_id)
     dfW = fabric.list_workspaces(filter=f"id eq '{filter_condition}'")
     capacity_id = dfW["Capacity Id"].iloc[0]
@@ -1634,16 +1634,7 @@ def pagination(client, response):
         if not continuation_token:
             break
 
-        try:
-            response = client.get(continuation_uri)
-
-        except FabricHTTPException as e:
-            # Handle FabricHTTPException (404)
-            if e.status_code == 404:
-                return responses
-
-            # If it's something else, re-raise
-            raise FabricHTTPException(response)
+        response = client.get(continuation_uri)
 
     return responses
 
