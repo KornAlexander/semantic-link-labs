@@ -175,6 +175,18 @@ def list_restorable_deleted_databases(
     This is a wrapper function for the following API: `Items - List Restorable Deleted SQL Databases <https://learn.microsoft.com/rest/api/fabric/sqldatabase/items/list-restorable-deleted-sql-databases>`_.
 
     Service Principal Authentication is supported (see `here <https://github.com/microsoft/semantic-link-labs/blob/main/notebooks/Service%20Principal.ipynb>`_ for examples).
+
+    Parameters
+    ----------
+    workspace : str | uuid.UUID, default=None
+        The Fabric workspace name or ID.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
+    
+    Returns
+    -------
+    pandas.DataFrame
+        A pandas dataframe showing a list of restorable deleted SQL databases in the Fabric workspace.
     """
 
     workspace_id = resolve_workspace_id(workspace)
