@@ -49,7 +49,7 @@ def list_data_access_roles(
         view = "MicrosoftEntraMembers"
     elif "fabric" in view.lower():
         view = "FabricItemMembers"
-    else:
+    elif "rules" in view.lower():
         view = "Rules"
     if view not in supported_views:
         raise ValueError(
@@ -68,10 +68,10 @@ def list_data_access_roles(
             {
                 "Effect": "string",
                 "File Path": "string",
-                "Permissions": "string",
+                "Permissions": "list",
                 "Row Level Security": "string",
-                "Column Level Security": "string",
-                "Column Permission": "string",
+                "Column Level Security": "list",
+                "Column Permission": "list",
             }
         )
     elif view == "MicrosoftEntraMembers":
@@ -97,7 +97,6 @@ def list_data_access_roles(
     responses = _base_api(
         request=f"/v1/workspaces/{workspace_id}/items/{item_id}/dataAccessRoles",
         uses_pagination=True,
-        client="fabric_sp",
     )
 
     rows = []
