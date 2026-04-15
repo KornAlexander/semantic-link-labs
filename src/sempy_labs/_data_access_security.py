@@ -106,8 +106,6 @@ def list_data_access_roles(
             name = role.get("name")
             role_id = role.get("id")
             etag = role.get("etag")
-            if etag:
-                etag = etag.rstrip('"').lstrip('"')
             kind = role.get("kind")
             if view == "Rules":
                 for rules in role.get("decisionRules", []):
