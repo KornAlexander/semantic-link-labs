@@ -13,7 +13,10 @@ import sempy_labs._icons as icons
 
 @log
 def list_data_access_roles(
-    item: str | UUID, type: str, workspace: Optional[str | UUID] = None, view: Literal["Rules", "MicrosoftEntraMembers", "FabricItemMembers"] = "Rules"
+    item: str | UUID,
+    type: str,
+    workspace: Optional[str | UUID] = None,
+    view: Literal["Rules", "MicrosoftEntraMembers", "FabricItemMembers"] = "Rules",
 ) -> pd.DataFrame:
     """
     Returns a list of OneLake roles.
@@ -42,14 +45,16 @@ def list_data_access_roles(
     """
 
     supported_views = ["Rules", "MicrosoftEntraMembers", "FabricItemMembers"]
-    if 'entra' in view.lower():
+    if "entra" in view.lower():
         view = "MicrosoftEntraMembers"
-    elif 'fabric' in view.lower():
-        view = 'FabricItemMembers'
+    elif "fabric" in view.lower():
+        view = "FabricItemMembers"
     else:
         view = "Rules"
     if view not in supported_views:
-        raise ValueError(f"{icons.red_dot} Only the following views are supported: {supported_views}. You entered '{view}'.")
+        raise ValueError(
+            f"{icons.red_dot} Only the following views are supported: {supported_views}. You entered '{view}'."
+        )
 
     columns = {
         "Role Name": "string",
@@ -58,25 +63,31 @@ def list_data_access_roles(
         "Kind": "string",
     }
 
-    if view == 'Rules':
-        columns.update({
-            "Effect": "string",
-            "File Path": "string",
-            "Permissions": "string",
-            "Row Level Security": "string",
-            "Column Level Security": "string",
-            "Column Permission": "string",
-        })
-    elif view == 'MicrosoftEntraMembers':
-        columns.update({
-            "Tenant Id": "string",
-            "Object Id": "string",
-        })
+    if view == "Rules":
+        columns.update(
+            {
+                "Effect": "string",
+                "File Path": "string",
+                "Permissions": "string",
+                "Row Level Security": "string",
+                "Column Level Security": "string",
+                "Column Permission": "string",
+            }
+        )
+    elif view == "MicrosoftEntraMembers":
+        columns.update(
+            {
+                "Tenant Id": "string",
+                "Object Id": "string",
+            }
+        )
     else:
-        columns.update({
-            "Source Path": "string",
-            "Item Access": "list",
-        })
+        columns.update(
+            {
+                "Source Path": "string",
+                "Item Access": "list",
+            }
+        )
 
     df = _create_dataframe(columns=columns)
 
@@ -93,57 +104,87 @@ def list_data_access_roles(
     for r in responses:
         for role in r.get("value", []):
             name = role.get("name")
-            role_id = role.get('id')
-            etag = role.get('etag')
+            role_id = role.get("id")
+            etag = role.get("etag")
             if etag:
                 etag = etag.rstrip('"').lstrip('"')
-            kind = role.get('kind')
-            if view == 'Rules':
-                for rules in role.get('decisionRules', []):
-                    effect = rules.get('effect')
-                    permissions = rules.get('permission', [])
-                    permission = next((perm.get('attributeValueIncludedIn', []) for perm in permissions if perm.get('attributeName') == 'Action'), [])
-                    paths = next((perm.get('attributeValueIncludedIn', []) for perm in permissions if perm.get('attributeName') == 'Path'), [])
+            kind = role.get("kind")
+            if view == "Rules":
+                for rules in role.get("decisionRules", []):
+                    effect = rules.get("effect")
+                    permissions = rules.get("permission", [])
+                    permission = next(
+                        (
+                            perm.get("attributeValueIncludedIn", [])
+                            for perm in permissions
+                            if perm.get("attributeName") == "Action"
+                        ),
+                        [],
+                    )
+                    paths = next(
+                        (
+                            perm.get("attributeValueIncludedIn", [])
+                            for perm in permissions
+                            if perm.get("attributeName") == "Path"
+                        ),
+                        [],
+                    )
 
-                    cls = rules.get('constraints', {}).get('columns', [])
-                    rls = rules.get('constraints', {}).get('rows', [])
+                    cls = rules.get("constraints", {}).get("columns", [])
+                    rls = rules.get("constraints", {}).get("rows", [])
                     for path in paths:
-                        row_level_security = next((r.get('value') for r in rls if r.get('tablePath') == path), None)
-                        column_level_security, column_action = next(((r.get('columnNames', []), r.get('columnAction', [])) for r in cls if r.get('tablePath') == path), (None, None))
-                        rows.append({
+                        row_level_security = next(
+                            (r.get("value") for r in rls if r.get("tablePath") == path),
+                            None,
+                        )
+                        column_level_security, column_action = next(
+                            (
+                                (r.get("columnNames", []), r.get("columnAction", []))
+                                for r in cls
+                                if r.get("tablePath") == path
+                            ),
+                            (None, None),
+                        )
+                        rows.append(
+                            {
+                                "Role Name": name,
+                                "Role Id": role_id,
+                                "Etag": etag,
+                                "Kind": kind,
+                                "Effect": effect,
+                                "File Path": path,
+                                "Permissions": permission,
+                                "Row Level Security": row_level_security,
+                                "Column Level Security": column_level_security,
+                                "Column Permission": column_action,
+                            }
+                        )
+            elif view == "MicrosoftEntraMembers":
+                members = role.get("members", {}).get("microsoftEntraMembers", [])
+                for member in members:
+                    rows.append(
+                        {
                             "Role Name": name,
                             "Role Id": role_id,
                             "Etag": etag,
                             "Kind": kind,
-                            "Effect": effect,
-                            "File Path": path,
-                            "Permissions": permission,
-                            "Row Level Security": row_level_security,
-                            "Column Level Security": column_level_security,
-                            "Column Permission": column_action,
-                        })
-            elif view == 'MicrosoftEntraMembers':
-                members = role.get('members', {}).get('microsoftEntraMembers', [])
-                for member in members:
-                    rows.append({
-                        "Role Name": name,
-                        "Role Id": role_id,
-                        "Etag": etag,
-                        "Kind": kind,
-                        "Tenant Id": member.get('tenantId'),
-                        "Object Id": member.get('objectId'),
-                    })
+                            "Tenant Id": member.get("tenantId"),
+                            "Object Id": member.get("objectId"),
+                        }
+                    )
             else:
-                members = role.get('members', {}).get('fabricItemMembers', [])
+                members = role.get("members", {}).get("fabricItemMembers", [])
                 for member in members:
-                    rows.append({
-                        "Role Name": name,
-                        "Role Id": role_id,
-                        "Etag": etag,
-                        "Kind": kind,
-                        "Source Path": member.get('sourcePath'),
-                        "Item Access": member.get('itemAccess', []),
-                    })
+                    rows.append(
+                        {
+                            "Role Name": name,
+                            "Role Id": role_id,
+                            "Etag": etag,
+                            "Kind": kind,
+                            "Source Path": member.get("sourcePath"),
+                            "Item Access": member.get("itemAccess", []),
+                        }
+                    )
     if rows:
         df = pd.DataFrame(rows, columns=list(columns.keys()))
 
