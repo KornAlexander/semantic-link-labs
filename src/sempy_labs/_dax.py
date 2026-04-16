@@ -138,7 +138,7 @@ def get_dax_query_dependencies(
                     "Referenced Object Type",[REFERENCED_OBJECT_TYPE],
                     "Referenced Table", [REFERENCED_TABLE],
                     "Referenced Object", [REFERENCED_OBJECT]
-                )             
+                )
             RETURN all_dependencies
             """
         dep = fabric.evaluate_dax(
