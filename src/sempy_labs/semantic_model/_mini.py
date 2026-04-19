@@ -567,6 +567,11 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
         background: var(--mm-accent-hover);
         box-shadow: 0 2px 8px rgba(0, 113, 227, 0.25);
     }}
+    .mm-{uid} .mm-save-btn:disabled {{
+        background: var(--mm-border-strong);
+        cursor: default;
+        box-shadow: none;
+    }}
     .mm-{uid} .mm-hidden {{ display: none !important; }}
     /* ── Changed indicator ── */
     .mm-{uid} .mm-cr.mm-changed::after,
@@ -1006,7 +1011,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
     h.append(f'<div class="mm-status" id="mm-status-{uid}">' f"No selections yet</div>")
     h.append(
         f'<button class="mm-save-btn" id="mm-save-{uid}" '
-        f'onclick="mmSave_{uid}()">Save</button>'
+        f'onclick="mmSave_{uid}()" disabled>Save</button>'
     )
     h.append("</div>")
     h.append(
@@ -1275,6 +1280,13 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             markCbChanged();
         }}
 
+        function syncSaveBtn() {{
+            var r = root();
+            var hasChanges = r.querySelectorAll('.mm-changed').length > 0;
+            var btn = $('mm-save-{uid}');
+            if (btn) btn.disabled = !hasChanges;
+        }}
+
         function markCbChanged() {{
             var r = root();
             r.querySelectorAll('.mm-kids input[type="checkbox"]').forEach(function(cb) {{
@@ -1288,6 +1300,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
                 var anyChanged = g.querySelectorAll('.mm-cr.mm-changed').length > 0;
                 if (tr) tr.classList.toggle('mm-changed', anyChanged);
             }});
+            syncSaveBtn();
         }}
 
         function setOrigRls() {{
@@ -1305,6 +1318,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
                 var row = inp.closest('.mm-rt');
                 if (row) row.classList.toggle('mm-changed', inp.value !== orig);
             }});
+            syncSaveBtn();
         }}
 
         function markFltChanged() {{
@@ -1312,6 +1326,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
                 var row = inp.closest('.mm-ft');
                 if (row) row.classList.toggle('mm-changed', inp.value.trim() !== '');
             }});
+            syncSaveBtn();
         }}
 
         window.mmFltInput_{uid} = function() {{ markFltChanged(); }};
