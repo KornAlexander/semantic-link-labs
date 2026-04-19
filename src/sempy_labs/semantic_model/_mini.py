@@ -133,6 +133,30 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             'stroke-width="1.2" stroke-linecap="round">'
             '<path d="M3 2.5v9M3 5h7.5M3 9h7.5"/></svg>'
         ),
+        "objects": (
+            '<svg class="mm-ico" width="14" height="14" '
+            'viewBox="0 0 14 14" fill="none" stroke="currentColor" '
+            'stroke-width="1.2" stroke-linecap="round">'
+            '<rect x="1.5" y="2" width="4" height="4" rx="1"/>'
+            '<rect x="8.5" y="2" width="4" height="4" rx="1"/>'
+            '<rect x="1.5" y="8" width="4" height="4" rx="1"/>'
+            '<rect x="8.5" y="8" width="4" height="4" rx="1"/></svg>'
+        ),
+        "filter": (
+            '<svg class="mm-ico" width="14" height="14" '
+            'viewBox="0 0 14 14" fill="none" stroke="currentColor" '
+            'stroke-width="1.3" stroke-linecap="round" '
+            'stroke-linejoin="round">'
+            '<path d="M1.5 2.5h11L8 7v4l-2 1.5V7z"/></svg>'
+        ),
+        "lock": (
+            '<svg class="mm-ico" width="14" height="14" '
+            'viewBox="0 0 14 14" fill="none" stroke="currentColor" '
+            'stroke-width="1.2" stroke-linecap="round" '
+            'stroke-linejoin="round">'
+            '<rect x="3" y="6" width="8" height="6.5" rx="1.5"/>'
+            '<path d="M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6"/></svg>'
+        ),
     }
 
     # ── CSS ───────────────────────────────────────────────────────────
@@ -565,7 +589,9 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
         border-bottom: 1px solid var(--mm-border);
     }}
     .mm-{uid} .mm-tab {{
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
         padding: 10px 16px 8px;
         font-size: 13px;
         font-weight: 500;
@@ -744,6 +770,10 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
     .mm-{uid} .mm-rls-input::placeholder {{
         color: var(--mm-text-tertiary);
     }}
+    .mm-{uid} .mm-rt.mm-disabled {{
+        opacity: 0.4;
+        pointer-events: none;
+    }}
     .mm-{uid} .mm-brand {{
         padding: 8px 28px;
         font-size: 11px;
@@ -771,29 +801,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
     h.append(f'<div class="mm-subtitle">{workspace_name}</div>')
     h.append("</div>")
 
-    # Tab bar
-    h.append('<div class="mm-tabs">')
-    h.append(
-        f'<button class="mm-tab mm-active" '
-        f"onclick=\"mmTab_{uid}(this, 'objects')\">"
-        "Objects</button>"
-    )
-    h.append(
-        f'<button class="mm-tab" '
-        f"onclick=\"mmTab_{uid}(this, 'filters')\">"
-        "Filters</button>"
-    )
-    h.append(
-        f'<button class="mm-tab" '
-        f"onclick=\"mmTab_{uid}(this, 'rls')\">"
-        "Row Level Security</button>"
-    )
-    h.append("</div>")
-
-    # ── Objects panel ─────────────────────────────────────────────────
-    h.append(f'<div class="mm-panel mm-visible" id="mm-panel-objects-{uid}">')
-
-    # Form
+    # Form (above tabs so it's visible on all pages)
     h.append('<div class="mm-form">')
     # Name input (hidden until + is clicked)
     h.append(f'<div class="mm-field mm-hidden" id="mm-name-field-{uid}">')
@@ -830,6 +838,28 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             f'onclick="mmNew_{uid}()">+</button>'
         )
     h.append("</div>")
+
+    # Tab bar
+    h.append('<div class="mm-tabs">')
+    h.append(
+        f'<button class="mm-tab mm-active" '
+        f"onclick=\"mmTab_{uid}(this, 'objects')\">"
+        f"{_ico['objects']} Objects</button>"
+    )
+    h.append(
+        f'<button class="mm-tab" '
+        f"onclick=\"mmTab_{uid}(this, 'filters')\">"
+        f"{_ico['filter']} Filters</button>"
+    )
+    h.append(
+        f'<button class="mm-tab" '
+        f"onclick=\"mmTab_{uid}(this, 'rls')\">"
+        f"{_ico['lock']} Row Level Security</button>"
+    )
+    h.append("</div>")
+
+    # ── Objects panel ─────────────────────────────────────────────────
+    h.append(f'<div class="mm-panel mm-visible" id="mm-panel-objects-{uid}">')
 
     # Toolbar
     h.append('<div class="mm-toolbar">')
@@ -918,8 +948,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
         h.append(
             f'<input type="text" class="mm-sql" '
             f'data-mm-ftable="{tn}" '
-            f'oninput="mmFltInput_{uid}()" '
-            f'placeholder="e.g. [Year] >= 2023" />'
+            f'oninput="mmFltInput_{uid}()" />'
         )
         h.append("</div>")
     h.append("</div>")
@@ -966,8 +995,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
         h.append(
             f'<input type="text" class="mm-rls-input" '
             f'data-mm-rtable="{tn}" '
-            f'oninput="mmRlsInput_{uid}()" '
-            f'placeholder="e.g. [Region] = &quot;West&quot;" />'
+            f'oninput="mmRlsInput_{uid}()" />'
         )
         h.append("</div>")
     h.append("</div>")
@@ -978,7 +1006,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
     h.append(f'<div class="mm-status" id="mm-status-{uid}">' f"No selections yet</div>")
     h.append(
         f'<button class="mm-save-btn" id="mm-save-{uid}" '
-        f'onclick="mmSave_{uid}()">Save Mini Model</button>'
+        f'onclick="mmSave_{uid}()">Save</button>'
     )
     h.append("</div>")
     h.append(
@@ -1055,6 +1083,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             syncStatus();
             syncFilters();
             markCbChanged();
+            syncRls();
         }};
 
         /* Child checkbox → update parent tri-state */
@@ -1063,6 +1092,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             syncStatus();
             syncFilters();
             markCbChanged();
+            syncRls();
         }};
 
         function syncParent(g) {{
@@ -1097,6 +1127,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             syncFilters();
             setOrigCb();
             markFltChanged();
+            syncRls();
         }};
 
         /* Load perspective */
@@ -1136,6 +1167,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             syncFilters();
             setOrigCb();
             markFltChanged();
+            syncRls();
         }};
 
         /* Select All / Clear All */
@@ -1150,6 +1182,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             syncStatus();
             syncFilters();
             markCbChanged();
+            syncRls();
         }};
 
         /* Filter */
@@ -1207,7 +1240,30 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             var empty = $('mm-rls-empty-{uid}');
             if (empty) empty.classList.add('mm-hidden');
             setOrigRls();
+            syncRls();
         }};
+
+        /* Sync RLS row disabled state based on selected objects */
+        function syncRls() {{
+            var r = root();
+            r.querySelectorAll('.mm-rt').forEach(function(rt) {{
+                if (rt.classList.contains('mm-hidden')) return;
+                var tbl = rt.getAttribute('data-mm-rtable');
+                var tcb = r.querySelector(
+                    'input[data-mm-role="table"][data-mm-table="' +
+                    CSS.escape(tbl) + '"]:checked');
+                var kids = r.querySelectorAll(
+                    '.mm-kids input[data-mm-table="' +
+                    CSS.escape(tbl) + '"]:checked');
+                var active = tcb || kids.length > 0;
+                rt.classList.toggle('mm-disabled', !active);
+                var inp = rt.querySelector('.mm-rls-input');
+                if (inp) {{
+                    inp.disabled = !active;
+                    inp.placeholder = active ? 'e.g. [Region] = "West"' : '';
+                }}
+            }});
+        }}
 
         /* Change tracking functions */
         function setOrigCb() {{
