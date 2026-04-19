@@ -93,6 +93,37 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
         " stroke-linejoin='round'/%3E%3C/svg%3E"
     )
 
+    # Inline SVG icons (use currentColor so they adapt to light/dark)
+    _ico = {
+        "table": (
+            '<svg class="mm-ico" width="14" height="14" '
+            'viewBox="0 0 14 14" fill="none" stroke="currentColor" '
+            'stroke-width="1.2">'
+            '<rect x="1.5" y="1.5" width="11" height="11" rx="1.5"/>'
+            '<line x1="1.5" y1="5.5" x2="12.5" y2="5.5"/>'
+            '<line x1="6" y1="5.5" x2="6" y2="12.5"/></svg>'
+        ),
+        "column": (
+            '<svg class="mm-ico" width="14" height="14" '
+            'viewBox="0 0 14 14" fill="none" stroke="currentColor" '
+            'stroke-width="1.3" stroke-linecap="round">'
+            '<path d="M7 2v10M4.5 2h5M4.5 12h5"/></svg>'
+        ),
+        "measure": (
+            '<svg class="mm-ico" width="14" height="14" '
+            'viewBox="0 0 14 14" fill="none" stroke="currentColor" '
+            'stroke-width="1.3" stroke-linecap="round" '
+            'stroke-linejoin="round">'
+            '<path d="M10.5 2.5H4L7 7l-3 4.5h6.5"/></svg>'
+        ),
+        "hierarchy": (
+            '<svg class="mm-ico" width="14" height="14" '
+            'viewBox="0 0 14 14" fill="none" stroke="currentColor" '
+            'stroke-width="1.2" stroke-linecap="round">'
+            '<path d="M3 2.5v9M3 5h7.5M3 9h7.5"/></svg>'
+        ),
+    }
+
     # ── CSS ───────────────────────────────────────────────────────────
     styles = f"""
     <style>
@@ -362,6 +393,15 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
         flex-shrink: 0;
         line-height: 1.4;
     }}
+    /* ── Icons ── */
+    .mm-{uid} .mm-ico {{
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        vertical-align: middle;
+        color: var(--mm-text-tertiary);
+    }}
     /* ── Children ── */
     .mm-{uid} .mm-kids {{
         display: none;
@@ -522,7 +562,10 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
 
     # Form
     h.append('<div class="mm-form">')
-    h.append('<div class="mm-field">')
+    # Name input (hidden until + is clicked)
+    h.append(
+        f'<div class="mm-field mm-hidden" id="mm-name-field-{uid}">'
+    )
     h.append('<label class="mm-label">Mini Model Name</label>')
     h.append(
         f'<input type="text" class="mm-input" id="mm-name-{uid}" '
@@ -551,6 +594,11 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
             f'onclick="mmNew_{uid}()">+</button>'
         )
         h.append("</div>")
+    else:
+        h.append(
+            f'<button class="mm-add-btn" title="New mini model" '
+            f'onclick="mmNew_{uid}()">+</button>'
+        )
     h.append("</div>")
 
     # Toolbar
@@ -591,6 +639,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
             f'onchange="mmTblCk_{uid}(this)" />'
             f'<span class="mm-ck"></span></label>'
         )
+        h.append(_ico["table"])
         h.append(f'<span class="mm-name">{tn}</span>')
         h.append(f'<span class="mm-badge">{cnt}</span>')
         h.append("</div>")
@@ -611,6 +660,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
                     f'data-mm-table="{tn}" data-mm-name="{ne}" '
                     f'onchange="mmChildCk_{uid}(this)" />'
                     f'<span class="mm-ck"></span></label>'
+                    f'{_ico[role]}'
                     f'<span class="mm-name">{ne}</span></div>'
                 )
 
@@ -696,6 +746,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
             if (sel) sel.selectedIndex = 0;
             root().querySelectorAll('.mm-tree input[type="checkbox"]')
                 .forEach(function(c) {{ c.checked = false; c.classList.remove('mm-ind'); }});
+            $('mm-name-field-{uid}').classList.remove('mm-hidden');
             $('mm-name-{uid}').value = '';
             $('mm-name-{uid}').focus();
             syncStatus();
@@ -707,6 +758,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
             var r = root();
             r.querySelectorAll('.mm-tree input[type="checkbox"]')
                 .forEach(function(c) {{ c.checked = false; c.classList.remove('mm-ind'); }});
+            $('mm-name-field-{uid}').classList.add('mm-hidden');
             $('mm-name-{uid}').value = v;
             var pData = null;
             for (var i = 0; i < P.length; i++) {{
@@ -783,11 +835,23 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
 
         /* Save (placeholder) */
         window.mmSave_{uid} = function() {{
-            var name = $('mm-name-{uid}').value.trim();
-            if (!name) {{
-                $('mm-name-{uid}').focus();
-                $('mm-status-{uid}').textContent = 'Please enter a name';
-                return;
+            var nameField = $('mm-name-field-{uid}');
+            var isNew = !nameField.classList.contains('mm-hidden');
+            var name;
+            if (isNew) {{
+                name = $('mm-name-{uid}').value.trim();
+                if (!name) {{
+                    $('mm-name-{uid}').focus();
+                    $('mm-status-{uid}').textContent = 'Please enter a name';
+                    return;
+                }}
+            }} else {{
+                var dd = $('mm-perspective-{uid}');
+                if (!dd || dd.selectedIndex <= 0) {{
+                    $('mm-status-{uid}').textContent = 'Select or create a mini model first';
+                    return;
+                }}
+                name = dd.value;
             }}
             var r = root();
             var sel = {{}};
@@ -800,11 +864,10 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
                         columns: [], measures: [], hierarchies: []}};
                     sel[tbl][role + 's'].push(obj);
                 }});
-            var dd = $('mm-perspective-{uid}');
             window._mm_save_data_{uid} = {{
                 name: name,
                 selections: sel,
-                isNew: !dd || dd.selectedIndex <= 0 || dd.value !== name
+                isNew: isNew
             }};
             $('mm-status-{uid}').textContent = 'Ready to save \\u201c' + name + '\\u201d';
         }};
