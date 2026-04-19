@@ -75,15 +75,26 @@ def mini_model_manager(dataset: str | UUID, workspace: Optional[str | UUID] = No
                     }
             perspectives.append({"name": p.Name, "members": members})
 
+        # ── Collect roles and RLS filters ─────────────────────────────
+        roles = []
+        for r in tom.model.Roles:
+            rls_filters = {}
+            for tp in r.TablePermissions:
+                expr = tp.FilterExpression
+                if expr:
+                    rls_filters[tp.Name] = expr
+            roles.append({"name": r.Name, "filters": rls_filters})
+
     # ── Render the UI ─────────────────────────────────────────────────
-    _render_mini_model_ui(model_name, workspace_name, tables, perspectives)
+    _render_mini_model_ui(model_name, workspace_name, tables, perspectives, roles)
 
 
-def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
+def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, roles):
     """Renders the interactive mini model manager HTML UI."""
 
     uid = uuid4().hex[:8]
     perspectives_json = json.dumps(perspectives)
+    roles_json = json.dumps(roles)
 
     # SVG data URI for select dropdown arrow (must be one line in CSS)
     _chevron_svg = (
@@ -533,6 +544,194 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
         box-shadow: 0 2px 8px rgba(0, 113, 227, 0.25);
     }}
     .mm-{uid} .mm-hidden {{ display: none !important; }}
+    /* ── Tabs ── */
+    .mm-{uid} .mm-tabs {{
+        display: flex;
+        gap: 0;
+        padding: 0 28px;
+        background: var(--mm-bg);
+        border-bottom: 1px solid var(--mm-border);
+    }}
+    .mm-{uid} .mm-tab {{
+        display: inline-block;
+        padding: 10px 16px 8px;
+        font-size: 13px;
+        font-weight: 500;
+        font-family: inherit;
+        color: var(--mm-text-tertiary);
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        line-height: 1.4;
+        transition: color 0.15s ease, border-color 0.15s ease;
+    }}
+    .mm-{uid} .mm-tab:hover {{
+        color: var(--mm-text-secondary);
+    }}
+    .mm-{uid} .mm-tab.mm-active {{
+        color: var(--mm-accent);
+        border-bottom-color: var(--mm-accent);
+    }}
+    .mm-{uid} .mm-panel {{
+        display: none;
+    }}
+    .mm-{uid} .mm-panel.mm-visible {{
+        display: block;
+    }}
+    /* ── Filters page ── */
+    .mm-{uid} .mm-filters {{
+        max-height: 460px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }}
+    .mm-{uid} .mm-filters::-webkit-scrollbar {{ width: 6px; }}
+    .mm-{uid} .mm-filters::-webkit-scrollbar-track {{
+        background: transparent;
+    }}
+    .mm-{uid} .mm-filters::-webkit-scrollbar-thumb {{
+        background: var(--mm-border-strong);
+        border-radius: 3px;
+    }}
+    .mm-{uid} .mm-flt-empty {{
+        padding: 32px 28px;
+        font-size: 13px;
+        color: var(--mm-text-tertiary);
+        text-align: center;
+        line-height: 1.5;
+    }}
+    .mm-{uid} .mm-ft {{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 28px 8px 16px;
+        border-bottom: 1px solid var(--mm-border);
+    }}
+    .mm-{uid} .mm-ft:last-child {{ border-bottom: none; }}
+    .mm-{uid} .mm-ft .mm-ft-name {{
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        width: 160px;
+        min-width: 100px;
+    }}
+    .mm-{uid} .mm-ft .mm-ft-name .mm-name {{
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
+    .mm-{uid} .mm-sql {{
+        display: block;
+        flex: 1;
+        height: 32px;
+        padding: 0 10px;
+        font-size: 12px;
+        font-family: "SF Mono", "Cascadia Code", "Fira Code",
+                     Menlo, Consolas, monospace;
+        background: var(--mm-bg-secondary);
+        border: 1px solid transparent;
+        border-radius: var(--mm-radius-xs);
+        color: var(--mm-text);
+        outline: none;
+        line-height: 30px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }}
+    .mm-{uid} .mm-sql:hover {{
+        border-color: var(--mm-border-strong);
+    }}
+    .mm-{uid} .mm-sql:focus {{
+        background: var(--mm-bg);
+        border-color: var(--mm-accent);
+        box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+    }}
+    .mm-{uid} .mm-sql::placeholder {{
+        color: var(--mm-text-tertiary);
+    }}
+    /* ── RLS page ── */
+    .mm-{uid} .mm-rls {{
+        max-height: 460px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }}
+    .mm-{uid} .mm-rls::-webkit-scrollbar {{ width: 6px; }}
+    .mm-{uid} .mm-rls::-webkit-scrollbar-track {{
+        background: transparent;
+    }}
+    .mm-{uid} .mm-rls::-webkit-scrollbar-thumb {{
+        background: var(--mm-border-strong);
+        border-radius: 3px;
+    }}
+    .mm-{uid} .mm-rls-bar {{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 28px;
+        background: var(--mm-bg-tertiary);
+        border-bottom: 1px solid var(--mm-border);
+    }}
+    .mm-{uid} .mm-rls-bar .mm-label {{
+        flex-shrink: 0;
+    }}
+    .mm-{uid} .mm-rls-empty {{
+        padding: 32px 28px;
+        font-size: 13px;
+        color: var(--mm-text-tertiary);
+        text-align: center;
+        line-height: 1.5;
+    }}
+    .mm-{uid} .mm-rt {{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 28px 8px 16px;
+        border-bottom: 1px solid var(--mm-border);
+    }}
+    .mm-{uid} .mm-rt:last-child {{ border-bottom: none; }}
+    .mm-{uid} .mm-rt .mm-ft-name {{
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        width: 160px;
+        min-width: 100px;
+    }}
+    .mm-{uid} .mm-rt .mm-ft-name .mm-name {{
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
+    .mm-{uid} .mm-rls-input {{
+        display: block;
+        flex: 1;
+        height: 32px;
+        padding: 0 10px;
+        font-size: 12px;
+        font-family: "SF Mono", "Cascadia Code", "Fira Code",
+                     Menlo, Consolas, monospace;
+        background: var(--mm-bg-secondary);
+        border: 1px solid transparent;
+        border-radius: var(--mm-radius-xs);
+        color: var(--mm-text);
+        outline: none;
+        line-height: 30px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }}
+    .mm-{uid} .mm-rls-input:hover {{
+        border-color: var(--mm-border-strong);
+    }}
+    .mm-{uid} .mm-rls-input:focus {{
+        background: var(--mm-bg);
+        border-color: var(--mm-accent);
+        box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+    }}
+    .mm-{uid} .mm-rls-input::placeholder {{
+        color: var(--mm-text-tertiary);
+    }}
     .mm-{uid} .mm-brand {{
         padding: 8px 28px;
         font-size: 11px;
@@ -560,12 +759,32 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
     h.append(f'<div class="mm-subtitle">{workspace_name}</div>')
     h.append("</div>")
 
+    # Tab bar
+    h.append('<div class="mm-tabs">')
+    h.append(
+        f'<button class="mm-tab mm-active" '
+        f"onclick=\"mmTab_{uid}(this, 'objects')\">"
+        "Objects</button>"
+    )
+    h.append(
+        f'<button class="mm-tab" '
+        f"onclick=\"mmTab_{uid}(this, 'filters')\">"
+        "Filters</button>"
+    )
+    h.append(
+        f'<button class="mm-tab" '
+        f"onclick=\"mmTab_{uid}(this, 'rls')\">"
+        "Row Level Security</button>"
+    )
+    h.append("</div>")
+
+    # ── Objects panel ─────────────────────────────────────────────────
+    h.append(f'<div class="mm-panel mm-visible" id="mm-panel-objects-{uid}">')
+
     # Form
     h.append('<div class="mm-form">')
     # Name input (hidden until + is clicked)
-    h.append(
-        f'<div class="mm-field mm-hidden" id="mm-name-field-{uid}">'
-    )
+    h.append(f'<div class="mm-field mm-hidden" id="mm-name-field-{uid}">')
     h.append('<label class="mm-label">Mini Model Name</label>')
     h.append(
         f'<input type="text" class="mm-input" id="mm-name-{uid}" '
@@ -581,8 +800,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
             f'onchange="mmLoad_{uid}(this.value)">'
         )
         h.append(
-            '<option value="" disabled selected>'
-            "Select a mini model\u2026</option>"
+            '<option value="" disabled selected>' "Select a mini model\u2026</option>"
         )
         for p in perspectives:
             ne = html_module.escape(p["name"])
@@ -624,13 +842,8 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
     for ti, t in enumerate(tables):
         tn = html_module.escape(t["name"])
         cnt = len(t["columns"]) + len(t["measures"]) + len(t["hierarchies"])
-        h.append(
-            f'<div class="mm-tg" data-mm-table="{tn}" '
-            f'id="mm-tg-{uid}-{ti}">'
-        )
-        h.append(
-            f'<div class="mm-tr" onclick="mmExpand_{uid}(this.parentElement)">'
-        )
+        h.append(f'<div class="mm-tg" data-mm-table="{tn}" ' f'id="mm-tg-{uid}-{ti}">')
+        h.append(f'<div class="mm-tr" onclick="mmExpand_{uid}(this.parentElement)">')
         h.append('<span class="mm-disc">\u25b8</span>')
         h.append(
             f'<label class="mm-cb" onclick="event.stopPropagation()">'
@@ -660,7 +873,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
                     f'data-mm-table="{tn}" data-mm-name="{ne}" '
                     f'onchange="mmChildCk_{uid}(this)" />'
                     f'<span class="mm-ck"></span></label>'
-                    f'{_ico[role]}'
+                    f"{_ico[role]}"
                     f'<span class="mm-name">{ne}</span></div>'
                 )
 
@@ -670,13 +883,85 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
         h.append("</div></div>")
 
     h.append("</div>")
+    h.append("</div>")  # close Objects panel
+
+    # ── Filters panel ─────────────────────────────────────────────────
+    h.append(f'<div class="mm-panel" id="mm-panel-filters-{uid}">')
+    h.append(f'<div class="mm-filters" id="mm-filters-{uid}">')
+    h.append(
+        '<div class="mm-flt-empty" '
+        f'id="mm-flt-empty-{uid}">'
+        "Select tables on the Objects tab to add filters.</div>"
+    )
+    for ti, t in enumerate(tables):
+        tn = html_module.escape(t["name"])
+        h.append(
+            f'<div class="mm-ft mm-hidden" '
+            f'data-mm-ftable="{tn}" id="mm-ft-{uid}-{ti}">'
+        )
+        h.append('<div class="mm-ft-name">')
+        h.append(_ico["table"])
+        h.append(f'<span class="mm-name">{tn}</span>')
+        h.append("</div>")
+        h.append(
+            f'<input type="text" class="mm-sql" '
+            f'data-mm-ftable="{tn}" '
+            f'placeholder="e.g. [Year] >= 2023" />'
+        )
+        h.append("</div>")
+    h.append("</div>")
+    h.append("</div>")  # close Filters panel
+
+    # ── RLS panel ──────────────────────────────────────────────────────
+    h.append(f'<div class="mm-panel" id="mm-panel-rls-{uid}">')
+    # Role selector bar
+    h.append('<div class="mm-rls-bar">')
+    h.append('<label class="mm-label">Role</label>')
+    if roles:
+        h.append(
+            f'<select class="mm-select" id="mm-rls-role-{uid}" '
+            f'onchange="mmRlsLoad_{uid}(this.value)" '
+            f'style="flex:1;max-width:300px">'
+        )
+        h.append('<option value="" disabled selected>' "Select a role\u2026</option>")
+        for rl in roles:
+            rn = html_module.escape(rl["name"])
+            h.append(f'<option value="{rn}">{rn}</option>')
+        h.append("</select>")
+    else:
+        h.append(
+            '<span style="font-size:13px;color:var(--mm-text-tertiary)">'
+            "No roles defined in this model</span>"
+        )
+    h.append("</div>")
+    # RLS table rows
+    h.append(f'<div class="mm-rls" id="mm-rls-{uid}">')
+    h.append(
+        f'<div class="mm-rls-empty" id="mm-rls-empty-{uid}">'
+        "Select a role above to view or edit filters.</div>"
+    )
+    for ti, t in enumerate(tables):
+        tn = html_module.escape(t["name"])
+        h.append(
+            f'<div class="mm-rt mm-hidden" '
+            f'data-mm-rtable="{tn}" id="mm-rt-{uid}-{ti}">'
+        )
+        h.append('<div class="mm-ft-name">')
+        h.append(_ico["table"])
+        h.append(f'<span class="mm-name">{tn}</span>')
+        h.append("</div>")
+        h.append(
+            f'<input type="text" class="mm-rls-input" '
+            f'data-mm-rtable="{tn}" '
+            f'placeholder="e.g. [Region] = &quot;West&quot;" />'
+        )
+        h.append("</div>")
+    h.append("</div>")
+    h.append("</div>")  # close RLS panel
 
     # Footer
     h.append('<div class="mm-footer">')
-    h.append(
-        f'<div class="mm-status" id="mm-status-{uid}">'
-        f"No selections yet</div>"
-    )
+    h.append(f'<div class="mm-status" id="mm-status-{uid}">' f"No selections yet</div>")
     h.append(
         f'<button class="mm-save-btn" id="mm-save-{uid}" '
         f'onclick="mmSave_{uid}()">Save Mini Model</button>'
@@ -694,10 +979,45 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
     <script>
     (function() {{
         var P = {perspectives_json};
+        var RL = {roles_json};
         var R = '.mm-{uid}';
 
         function root() {{ return document.querySelector(R); }}
         function $(id) {{ return document.getElementById(id); }}
+
+        /* Tab switching */
+        window.mmTab_{uid} = function(btn, tab) {{
+            var r = root();
+            r.querySelectorAll('.mm-tab').forEach(function(b) {{
+                b.classList.remove('mm-active');
+            }});
+            btn.classList.add('mm-active');
+            r.querySelectorAll('.mm-panel').forEach(function(p) {{
+                p.classList.remove('mm-visible');
+            }});
+            var panel = $('mm-panel-' + tab + '-{uid}');
+            if (panel) panel.classList.add('mm-visible');
+        }};
+
+        /* Sync filter table visibility with checked tables */
+        function syncFilters() {{
+            var r = root();
+            var any = false;
+            r.querySelectorAll('.mm-ft').forEach(function(ft) {{
+                var tbl = ft.getAttribute('data-mm-ftable');
+                var tcb = r.querySelector(
+                    'input[data-mm-role="table"][data-mm-table="' +
+                    CSS.escape(tbl) + '"]');
+                var kids = r.querySelectorAll(
+                    '.mm-kids input[data-mm-table="' +
+                    CSS.escape(tbl) + '"]:checked');
+                var show = (tcb && tcb.checked) || kids.length > 0;
+                ft.classList.toggle('mm-hidden', !show);
+                if (show) any = true;
+            }});
+            var empty = $('mm-flt-empty-{uid}');
+            if (empty) empty.classList.toggle('mm-hidden', any);
+        }}
 
         /* Expand / Collapse with animation */
         window.mmExpand_{uid} = function(g) {{
@@ -717,12 +1037,14 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
             tcb.classList.remove('mm-ind');
             cbs.forEach(function(c) {{ c.checked = tcb.checked; }});
             syncStatus();
+            syncFilters();
         }};
 
         /* Child checkbox → update parent tri-state */
         window.mmChildCk_{uid} = function(cb) {{
             syncParent(cb.closest('.mm-tg'));
             syncStatus();
+            syncFilters();
         }};
 
         function syncParent(g) {{
@@ -749,7 +1071,12 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
             $('mm-name-field-{uid}').classList.remove('mm-hidden');
             $('mm-name-{uid}').value = '';
             $('mm-name-{uid}').focus();
+            /* Clear all filter textareas */
+            root().querySelectorAll('.mm-sql').forEach(function(ta) {{
+                ta.value = '';
+            }});
             syncStatus();
+            syncFilters();
         }};
 
         /* Load perspective */
@@ -781,7 +1108,12 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
                 }});
             }}
             r.querySelectorAll('.mm-tg').forEach(function(g) {{ syncParent(g); }});
+            /* Clear filter textareas */
+            r.querySelectorAll('.mm-sql').forEach(function(ta) {{
+                ta.value = '';
+            }});
             syncStatus();
+            syncFilters();
         }};
 
         /* Select All / Clear All */
@@ -794,6 +1126,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
                     }}
                 }});
             syncStatus();
+            syncFilters();
         }};
 
         /* Filter */
@@ -833,6 +1166,25 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
                 : n + ' object' + (n !== 1 ? 's' : '') + ' selected';
         }}
 
+        /* Load RLS for selected role */
+        window.mmRlsLoad_{uid} = function(roleName) {{
+            var r = root();
+            var roleData = null;
+            for (var i = 0; i < RL.length; i++) {{
+                if (RL[i].name === roleName) {{ roleData = RL[i]; break; }}
+            }}
+            r.querySelectorAll('.mm-rt').forEach(function(rt) {{
+                rt.classList.remove('mm-hidden');
+                var tbl = rt.getAttribute('data-mm-rtable');
+                var inp = rt.querySelector('.mm-rls-input');
+                if (inp) {{
+                    inp.value = (roleData && roleData.filters[tbl]) || '';
+                }}
+            }});
+            var empty = $('mm-rls-empty-{uid}');
+            if (empty) empty.classList.add('mm-hidden');
+        }};
+
         /* Save (placeholder) */
         window.mmSave_{uid} = function() {{
             var nameField = $('mm-name-field-{uid}');
@@ -864,9 +1216,32 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives):
                         columns: [], measures: [], hierarchies: []}};
                     sel[tbl][role + 's'].push(obj);
                 }});
+            /* Collect filters */
+            var filters = {{}};
+            r.querySelectorAll('.mm-sql').forEach(function(ta) {{
+                var v = ta.value.trim();
+                if (v) {{
+                    var tbl = ta.getAttribute('data-mm-ftable');
+                    filters[tbl] = v;
+                }}
+            }});
+            /* Collect RLS */
+            var rls = {{}};
+            var rlsRole = $('mm-rls-role-{uid}');
+            var rlsRoleName = (rlsRole && rlsRole.selectedIndex > 0)
+                ? rlsRole.value : null;
+            if (rlsRoleName) {{
+                r.querySelectorAll('.mm-rls-input').forEach(function(inp) {{
+                    var v = inp.value.trim();
+                    var tbl = inp.getAttribute('data-mm-rtable');
+                    rls[tbl] = v;
+                }});
+            }}
             window._mm_save_data_{uid} = {{
                 name: name,
                 selections: sel,
+                filters: filters,
+                rls: {{ role: rlsRoleName, filters: rls }},
                 isNew: isNew
             }};
             $('mm-status-{uid}').textContent = 'Ready to save \\u201c' + name + '\\u201d';
