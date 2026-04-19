@@ -544,6 +544,18 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
         box-shadow: 0 2px 8px rgba(0, 113, 227, 0.25);
     }}
     .mm-{uid} .mm-hidden {{ display: none !important; }}
+    /* ── Changed indicator ── */
+    .mm-{uid} .mm-cr.mm-changed::after,
+    .mm-{uid} .mm-tr.mm-changed::after,
+    .mm-{uid} .mm-ft.mm-changed::after,
+    .mm-{uid} .mm-rt.mm-changed::after {{
+        content: '';
+        width: 6px;
+        height: 6px;
+        background: #f5a623;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }}
     /* ── Tabs ── */
     .mm-{uid} .mm-tabs {{
         display: flex;
@@ -906,6 +918,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
         h.append(
             f'<input type="text" class="mm-sql" '
             f'data-mm-ftable="{tn}" '
+            f'oninput="mmFltInput_{uid}()" '
             f'placeholder="e.g. [Year] >= 2023" />'
         )
         h.append("</div>")
@@ -953,6 +966,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
         h.append(
             f'<input type="text" class="mm-rls-input" '
             f'data-mm-rtable="{tn}" '
+            f'oninput="mmRlsInput_{uid}()" '
             f'placeholder="e.g. [Region] = &quot;West&quot;" />'
         )
         h.append("</div>")
@@ -981,6 +995,8 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
         var P = {perspectives_json};
         var RL = {roles_json};
         var R = '.mm-{uid}';
+        var _origCb = {{}};
+        var _origRls = {{}};
 
         function root() {{ return document.querySelector(R); }}
         function $(id) {{ return document.getElementById(id); }}
@@ -1038,6 +1054,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             cbs.forEach(function(c) {{ c.checked = tcb.checked; }});
             syncStatus();
             syncFilters();
+            markCbChanged();
         }};
 
         /* Child checkbox → update parent tri-state */
@@ -1045,6 +1062,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             syncParent(cb.closest('.mm-tg'));
             syncStatus();
             syncFilters();
+            markCbChanged();
         }};
 
         function syncParent(g) {{
@@ -1077,6 +1095,8 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             }});
             syncStatus();
             syncFilters();
+            setOrigCb();
+            markFltChanged();
         }};
 
         /* Load perspective */
@@ -1114,6 +1134,8 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             }});
             syncStatus();
             syncFilters();
+            setOrigCb();
+            markFltChanged();
         }};
 
         /* Select All / Clear All */
@@ -1127,6 +1149,7 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
                 }});
             syncStatus();
             syncFilters();
+            markCbChanged();
         }};
 
         /* Filter */
@@ -1183,7 +1206,60 @@ def _render_mini_model_ui(model_name, workspace_name, tables, perspectives, role
             }});
             var empty = $('mm-rls-empty-{uid}');
             if (empty) empty.classList.add('mm-hidden');
+            setOrigRls();
         }};
+
+        /* Change tracking functions */
+        function setOrigCb() {{
+            _origCb = {{}};
+            root().querySelectorAll('.mm-kids input[type="checkbox"]').forEach(function(cb) {{
+                var key = cb.getAttribute('data-mm-table') + '|' + cb.getAttribute('data-mm-role') + '|' + cb.getAttribute('data-mm-name');
+                _origCb[key] = cb.checked;
+            }});
+            markCbChanged();
+        }}
+
+        function markCbChanged() {{
+            var r = root();
+            r.querySelectorAll('.mm-kids input[type="checkbox"]').forEach(function(cb) {{
+                var key = cb.getAttribute('data-mm-table') + '|' + cb.getAttribute('data-mm-role') + '|' + cb.getAttribute('data-mm-name');
+                var orig = _origCb[key] || false;
+                var row = cb.closest('.mm-cr');
+                if (row) row.classList.toggle('mm-changed', cb.checked !== orig);
+            }});
+            r.querySelectorAll('.mm-tg').forEach(function(g) {{
+                var tr = g.querySelector('.mm-tr');
+                var anyChanged = g.querySelectorAll('.mm-cr.mm-changed').length > 0;
+                if (tr) tr.classList.toggle('mm-changed', anyChanged);
+            }});
+        }}
+
+        function setOrigRls() {{
+            _origRls = {{}};
+            root().querySelectorAll('.mm-rls-input').forEach(function(inp) {{
+                _origRls[inp.getAttribute('data-mm-rtable')] = inp.value;
+            }});
+            markRlsChanged();
+        }}
+
+        function markRlsChanged() {{
+            root().querySelectorAll('.mm-rls-input').forEach(function(inp) {{
+                var tbl = inp.getAttribute('data-mm-rtable');
+                var orig = _origRls[tbl] || '';
+                var row = inp.closest('.mm-rt');
+                if (row) row.classList.toggle('mm-changed', inp.value !== orig);
+            }});
+        }}
+
+        function markFltChanged() {{
+            root().querySelectorAll('.mm-sql').forEach(function(inp) {{
+                var row = inp.closest('.mm-ft');
+                if (row) row.classList.toggle('mm-changed', inp.value.trim() !== '');
+            }});
+        }}
+
+        window.mmFltInput_{uid} = function() {{ markFltChanged(); }};
+        window.mmRlsInput_{uid} = function() {{ markRlsChanged(); }};
 
         /* Save (placeholder) */
         window.mmSave_{uid} = function() {{
