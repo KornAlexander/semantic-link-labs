@@ -46,7 +46,7 @@ def _table_ref(schema_name, entity_name):
     return entity_sql
 
 
-def filter_model(
+def create_mlvs_based_on_filters(
     dataset: str | UUID,
     mini_model_name: str,
     filters: dict,
@@ -85,7 +85,9 @@ def filter_model(
     with connect_semantic_model(dataset=dataset, workspace=workspace) as tom:
         # Validation
         if any(p for p in tom.all_partitions() if str(p.Mode) != "DirectLake"):
-            print(f"{icons.red_dot} Only DirectLake partitions are supported for filtering.")
+            print(
+                f"{icons.red_dot} Only DirectLake partitions are supported for filtering."
+            )
             return
 
         if len(sources) > 1:
@@ -214,7 +216,9 @@ def filter_model(
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {mini_model_name}")
     for table_name, query in queries.items():
         name = f"{mini_model_name}.{table_name}"
-        print(f"{icons.in_progress} Creating the '{name}' materialized lake view for the '{table_name}'.")
+        print(
+            f"{icons.in_progress} Creating the '{name}' materialized lake view for the '{table_name}'."
+        )
         spark.sql(f"DROP MATERIALIZED LAKE VIEW IF EXISTS {name}")
         spark.sql(f"CREATE MATERIALIZED LAKE VIEW {name} AS {query}")
-        print(f"{icons.green_dot} Created.")
+        print(f"{icons.green_dot} Created the '{name}' materialized view.")
