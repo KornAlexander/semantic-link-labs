@@ -226,3 +226,26 @@ def schema_exists(
     # )
 
     # response.json()
+
+
+@log
+def create_schema(
+    name: str,
+    lakehouse: Optional[str | UUID] = None,
+    workspace: Optional[str | UUID] = None,
+):
+
+    from sempy_labs._sql import ConnectLakehouse
+
+    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    (lakehouse_name, lakehouse_id) = resolve_lakehouse_name_and_id(
+        lakehouse=lakehouse, workspace=workspace_id
+    )
+
+    if not schema_exists(schema=name, lakehouse=lakehouse_id, workspace=workspace_id):
+        with ConnectLakehouse(lakehouse=lakehouse_id, workspace=workspace_id) as sql:
+
+            sql.query(f""" CREATE SCHEMA {name}""")
+            print(
+                f"{icons.green_dot} The '{name}' schema has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
+            )
