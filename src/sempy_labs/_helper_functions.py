@@ -2474,7 +2474,7 @@ def _pure_python_notebook() -> bool:
 def _create_spark_session():
 
     if _pure_python_notebook():
-        raise ValueError(
+        raise EnvironmentError(
             f"{icons.red_dot} This function is only available in a PySpark notebook."
         )
 
