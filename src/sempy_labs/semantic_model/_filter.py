@@ -93,10 +93,12 @@ def create_mlvs_based_on_filters(
         if len(sources) > 1:
             print("Multiple DirectLake sources are not supported for filtering.")
             return
-        item_id = next(s.get("itemId") for s in sources)
-        if item_id != fabric.get_lakehouse_id():
-            print("The Direct Lake source must be from the same lakehouse.")
+        (item_name, item_type, item_workspace_name) = next((s.get("itemName"), s.get('itemType'), s.get('workspaceName')) for s in sources)
+        if item_type != 'Lakehouse':
+            print(f"Only supports lakehouse sources.")
             return
+
+        from_location = f"`{item_workspace_name}`.`{item_name}`"
 
         # Map of table_name -> (schema_name, entity_name)
         table_sources = {}
@@ -170,8 +172,7 @@ def create_mlvs_based_on_filters(
             # Assemble the SQL.
             base_schema, base_entity = table_sources[base_table]
             sql = (
-                f"SELECT `{base_table}`.* FROM "
-                f"{_table_ref(base_schema, base_entity)} AS `{base_table}`"
+                f"SELECT `{base_table}`.* FROM {from_location}.{_table_ref(base_schema, base_entity)} AS `{base_table}`"
             )
 
             # Emit joins in topological order (parents before children)
@@ -189,7 +190,7 @@ def create_mlvs_based_on_filters(
                             continue
                         child_schema, child_entity = table_sources[child]
                         sql += (
-                            f" INNER JOIN {_table_ref(child_schema, child_entity)} "
+                            f" INNER JOIN {from_location}.{_table_ref(child_schema, child_entity)} "
                             f"AS `{child}` ON `{parent}`.`{many_c}` = "
                             f"`{child}`.`{one_c}`"
                         )
