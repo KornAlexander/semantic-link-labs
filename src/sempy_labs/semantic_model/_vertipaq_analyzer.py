@@ -187,6 +187,11 @@ def vertipaq_analyzer(
         A dictionary of pandas dataframes showing the vertipaq analyzer statistics.
     """
 
+    if export is not None:
+        export = export.lower()
+    if export not in (None, 'table'):
+        raise ValueError(f"{icons.red_dot} Invalid value for 'export'. Expected None or 'table'.")
+
     from sempy_labs.tom import connect_semantic_model
 
     (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
@@ -1040,17 +1045,17 @@ def vertipaq_analyzer(
             "Timestamp": now,
         }
 
-        df_map = {
-            k: final_dict[k]["data"]
-            for k in [
-                "Columns",
-                "Tables",
-                "Partitions",
-                "Relationships",
-                "Hierarchies",
-                "Model",
-            ]
-        }
+        #df_map = {
+        #    k: final_dict[k]["data"]
+        #    for k in [
+        #        "Columns",
+        #        "Tables",
+        #        "Partitions",
+        #        "Relationships",
+        #        "Hierarchies",
+        #        "Model",
+        #    ]
+        #}
 
         ordered_prefix = [
             "Capacity Name",
@@ -1062,7 +1067,9 @@ def vertipaq_analyzer(
             "Configured By",
         ]
 
-        for obj, df in df_map.items():
+        for obj, df in final_dict.items():
+            if obj == 'Model Summary':
+                obj = 'Model'
 
             # Add metadata columns
             df = df.assign(**base_metadata)
