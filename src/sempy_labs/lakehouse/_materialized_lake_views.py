@@ -171,6 +171,8 @@ def create_materialized_lake_view(
     """
     Creates a materialized lake view within a lakehouse.
 
+    Requirements: This function must be executed in a PySpark notebook.
+
     Parameters
     ----------
     name : str
@@ -223,3 +225,5 @@ def create_materialized_lake_view(
     def view():
         df = spark.sql(query)
         return df
+
+    print(f"{icons.green_dot} The materialized lake view '{name}' has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace.")

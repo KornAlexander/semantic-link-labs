@@ -1,13 +1,12 @@
 import re
-import sempy.fabric as fabric
 from uuid import UUID
 from typing import Optional
 from sempy_labs.tom import connect_semantic_model
-from sempy_labs._helper_functions import (
-    _create_spark_session,
-)
 from sempy_labs.directlake._sources import get_direct_lake_sources
 import sempy_labs._icons as icons
+from sempy_labs.lakehouse._schemas import create_schema
+from sempy_labs.lakehouse._materialized_lake_views import create_materialized_lake_view
+from sempy._utils._log import log
 
 
 def normalize_filter(f, alias=None):
@@ -46,14 +45,14 @@ def _table_ref(schema_name, entity_name):
     return entity_sql
 
 
+@log
 def create_mlvs_based_on_filters(
     dataset: str | UUID,
     mini_model_name: str,
     filters: dict,
     workspace: Optional[str | UUID] = None,
 ):
-    """Create materialized lake views for a filtered subset of a Direct Lake
-    semantic model.
+    """Create materialized lake views for a filtered subset of a Direct Lake semantic model.
 
     For each table listed in ``filters`` a materialized lake view is
     created (or replaced) in the ``mini_model_name`` schema with the
@@ -63,19 +62,30 @@ def create_mlvs_based_on_filters(
     related "one" side tables applied via the appropriate joins. This
     propagation follows relationship chains transitively.
 
-    Example
-    -------
-    ::
+    Parameters
+    ----------
+    dataset : str | uuid.UUID
+        The name or ID of the semantic model.
+    mini_model_name : str
+        The name of the mini model. This will be the name of the schema in which the materialized lake views are created.
+    filters : dict
+        A mapping of table name to filter expression.
 
-        filters = {
-            "Customer": "City = 'San Isidro'",
-            "Sales":    "SaleKey > 100",
-        }
+        Example
+        -------
+            filters = {
+                "Customer": "City = 'San Isidro'",
+                "Sales":    "SaleKey > 100",
+            }
 
-    If ``Sales`` has a many-to-one OneDirection relationship to
-    ``Customer``, the resulting ``Sales`` materialized view will include
-    both the ``SaleKey > 100`` predicate and a join to ``Customer``
-    constrained to ``City = 'San Isidro'``.
+        If ``Sales`` has a many-to-one OneDirection relationship to
+        ``Customer``, the resulting ``Sales`` materialized view will include
+        both the ``SaleKey > 100`` predicate and a join to ``Customer``
+        constrained to ``City = 'San Isidro'``.
+    workspace : str | uuid.UUID, default=None
+        The Fabric workspace name or ID used by the lakehouse.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
     """
 
     queries = {}
@@ -93,8 +103,8 @@ def create_mlvs_based_on_filters(
         if len(sources) > 1:
             print("Multiple DirectLake sources are not supported for filtering.")
             return
-        (item_name, item_type, item_workspace_name) = next(
-            (s.get("itemName"), s.get("itemType"), s.get("workspaceName"))
+        (item_id, item_name, item_type, item_workspace_id, item_workspace_name) = next(
+            (s.get("itemId"), s.get("itemName"), s.get("itemType"), s.get("workspaceId"), s.get("workspaceName"))
             for s in sources
         )
         if item_type != "Lakehouse":
@@ -214,13 +224,12 @@ def create_mlvs_based_on_filters(
             queries[base_table] = sql
 
     # Build materialized views for the filtered (and propagated) tables
-    spark = _create_spark_session()
-    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {mini_model_name}")
+    create_schema(name=mini_model_name, lakehouse=item_id, workspace=item_workspace_id)
+
     for table_name, query in queries.items():
         name = f"{mini_model_name}.{table_name}"
         print(
             f"{icons.in_progress} Creating the '{name}' materialized lake view for the '{table_name}'."
         )
-        spark.sql(f"DROP MATERIALIZED LAKE VIEW IF EXISTS {name}")
-        spark.sql(f"CREATE MATERIALIZED LAKE VIEW {name} AS {query}")
-        print(f"{icons.green_dot} Created the '{name}' materialized view.")
+
+        create_materialized_lake_view(name=name, query=query, lakehouse=item_id, workspace=item_workspace_id, replace=True)
