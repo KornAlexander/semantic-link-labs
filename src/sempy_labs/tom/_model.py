@@ -18,6 +18,10 @@ from sempy_labs._helper_functions import (
     resolve_lakehouse_id,
     _validate_weight,
     _create_dataframe,
+    normalize_filter,
+    _table_ref,
+    resolve_workspace_name,
+    to_delta_table_name,
 )
 from sempy_labs._list_functions import list_relationships
 from sempy_labs._refresh_semantic_model import refresh_semantic_model
@@ -5947,6 +5951,317 @@ class TOMWrapper:
             self.model.Cultures[culture_name].LinguisticMetadata.Content = json.dumps(
                 schema_file, indent=4
             )
+
+    # Direct Lake sources
+    def _extract_expression_list(self, expression) -> List:
+        """
+        Finds the pattern for DL/SQL & DL/OL expressions in the semantic model.
+        """
+
+        pattern_sql = r'Sql\.Database\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)'
+        pattern_no_sql = (
+            r'AzureStorage\.DataLake\(".*?/([0-9a-fA-F\-]{36})/([0-9a-fA-F\-]{36})"'
+        )
+
+        match_sql = re.search(pattern_sql, expression)
+        match_no_sql = re.search(pattern_no_sql, expression)
+
+        result = []
+        if match_sql:
+            value_1, value_2 = match_sql.groups()
+            result = [value_1, value_2, True]
+        elif match_no_sql:
+            value_1, value_2 = match_no_sql.groups()
+            result = [value_1, value_2, False]
+
+        return result
+
+    def _get_direct_lake_expressions(self) -> dict:
+        result = {}
+
+        for e in self.model.Expressions:
+            expr_name = e.Name
+            expr = e.Expression
+
+            list_values = self._extract_expression_list(expr)
+            if list_values:
+                result[expr_name] = list_values
+
+        return result
+
+    def get_direct_lake_sources(self) -> List[dict]:
+        """
+        Retrieves a list of the Direct Lake sources used in a semantic model, including their type, workspace, and whether they use a SQL endpoint.
+
+        Returns:
+        typing.List[dict]
+            A list of dictionaries, each containing details about a Direct Lake source used in the semantic model.
+            Example:
+            [
+                {
+                    "itemId": "123e4567-e89b-12d3-a456-426614174000",
+                    "itemName": "My Lakehouse",
+                    "itemType": "Lakehouse",
+                    "workspaceId": "123e4567-e89b-12d3-a456-426614174001",
+                    "workspaceName": "Workspace A",
+                    "usesSqlEndpoint": False,
+                    "expressionName": "DL Lake 1",
+                },
+                {
+                    "itemId": "123e4567-e89b-12d3-a456-426614174002",
+                    "itemName": "My Data Source",
+                    "itemType": "Warehouse",
+                    "workspaceId": "123e4567-e89b-12d3-a456-426614174001",
+                    "workspaceName": "Workspace A",
+                    "usesSqlEndpoint": False,
+                    "expressionName": "DL Warehouse 1",
+                }
+            ]
+
+        """
+
+        sql = "SqlAnalyticsEndpoint"
+        sources = []
+        expr = self._get_direct_lake_expressions()
+        for name, items in expr.items():
+            artifact_id = items[1]
+            uses_sql_endpoint = items[2]
+            result = _base_api(
+                request=f"metadata/artifacts/{artifact_id}", client="internal"
+            ).json()
+            item_type = result.get("artifactType")
+            item_name = result.get("displayName")
+            item_workspace_id = result.get("folderObjectId")
+            parent_artifact_id = result.get("parentArtifactObjectId")
+
+            type = "Lakehouse" if item_type == sql else item_type
+            item_id = parent_artifact_id if item_type == sql else artifact_id
+
+            sources.append(
+                {
+                    "itemId": item_id,
+                    "itemName": item_name,
+                    "itemType": type,
+                    "workspaceId": item_workspace_id,
+                    "workspaceName": resolve_workspace_name(item_workspace_id),
+                    "usesSqlEndpoint": uses_sql_endpoint,
+                    "expressionName": name,
+                }
+            )
+
+        return sources
+
+    def _create_mlvs_based_on_filters(
+        self,
+        filters: dict,
+        schema: Optional[str] = None,
+    ):
+        """Create materialized lake views for a filtered subset of a Direct Lake semantic model.
+
+        For each table listed in ``filters`` a materialized lake view is
+        created (or replaced) in the ``schema`` schema with the
+        supplied filter applied. In addition, filters are propagated through
+        the model's many-to-one single-direction relationships: any table on
+        the "many" side of such a relationship will have the filters of its
+        related "one" side tables applied via the appropriate joins. This
+        propagation follows relationship chains transitively.
+
+        Parameters
+        ----------
+        filters : dict
+            A mapping of table name to filter expression.
+
+            Example
+            -------
+                filters = {
+                    "Customer": "City = 'San Isidro'",
+                    "Sales":    "SaleKey > 100",
+                }
+
+            If ``Sales`` has a many-to-one OneDirection relationship to
+            ``Customer``, the resulting ``Sales`` materialized view will include
+            both the ``SaleKey > 100`` predicate and a join to ``Customer``
+            constrained to ``City = 'San Isidro'``.
+        schema : str, default=None
+            The name of the schema in which to create the materialized lake views.
+        """
+        import Microsoft.AnalysisServices.Tabular as TOM
+        from sempy_labs.lakehouse._schemas import create_schema
+        from sempy_labs.lakehouse._materialized_lake_views import (
+            create_materialized_lake_view,
+        )
+
+        queries = {}
+
+        # Validation
+        if any(p for p in self.all_partitions() if p.Mode != TOM.ModeType.DirectLake):
+            print(
+                f"{icons.red_dot} Only Direct Lake partitions are supported for filtering."
+            )
+            return
+
+        sources = self.get_direct_lake_sources()
+
+        if len(sources) > 1:
+            print("Multiple Direct Lake sources are not supported for filtering.")
+            return
+        (item_id, item_name, item_type, item_workspace_id, item_workspace_name) = next(
+            (
+                s.get("itemId"),
+                s.get("itemName"),
+                s.get("itemType"),
+                s.get("workspaceId"),
+                s.get("workspaceName"),
+            )
+            for s in sources
+        )
+        if item_type != "Lakehouse":
+            print(f"Only supports lakehouse sources.")
+            return
+
+        from_location = f"`{item_workspace_name}`.`{item_name}`"
+
+        # Map of table_name -> (schema_name, entity_name)
+        table_sources = {}
+        for p in self.all_partitions():
+            tn = p.Parent.Name
+            if tn not in table_sources:
+                table_sources[tn] = (p.Source.SchemaName, p.Source.EntityName)
+
+        # Build directed edges representing filter propagation via
+        # many-to-one OneDirection relationships. A filter on the "one"
+        # side flows to the "many" side, so we store edges as
+        # many_table -> [(one_table, many_column, one_column), ...].
+        m2o_edges: dict[str, list[tuple[str, str, str]]] = {}
+        for r in self.model.Relationships:
+            if str(r.CrossFilteringBehavior) != "OneDirection":
+                continue
+            from_card = str(r.FromCardinality)
+            to_card = str(r.ToCardinality)
+            if from_card == "Many" and to_card == "One":
+                many_t, many_c = r.FromTable.Name, r.FromColumn.Name
+                one_t, one_c = r.ToTable.Name, r.ToColumn.Name
+            elif from_card == "One" and to_card == "Many":
+                many_t, many_c = r.ToTable.Name, r.ToColumn.Name
+                one_t, one_c = r.FromTable.Name, r.FromColumn.Name
+            else:
+                continue
+            m2o_edges.setdefault(many_t, []).append((one_t, many_c, one_c))
+
+        # Determine, for every table in the model, which filtered tables
+        # are reachable via m2o edges (and the join tree leading there).
+        all_tables = {t.Name for t in self.model.Tables}
+        filtered_tables = set(filters.keys())
+
+        for base_table in all_tables:
+            # BFS from base_table through m2o edges, recording a single
+            # parent per discovered table so we can reconstruct a tree.
+            parents: dict[str, Optional[tuple[str, str, str]]] = {base_table: None}
+            queue = [base_table]
+            while queue:
+                node = queue.pop(0)
+                for one_t, many_c, one_c in m2o_edges.get(node, []):
+                    if one_t not in parents:
+                        parents[one_t] = (node, many_c, one_c)
+                        queue.append(one_t)
+
+            reachable_filtered = [
+                t for t in parents if t in filtered_tables and t != base_table
+            ]
+            has_own_filter = base_table in filtered_tables
+
+            if not has_own_filter and not reachable_filtered:
+                continue
+
+            if base_table not in table_sources:
+                # Table not backed by a Direct Lake partition; skip.
+                continue
+
+            # Walk back from each reachable filtered table to collect the
+            # joins we need. Keyed by the joined (child) table so each
+            # intermediate is joined at most once.
+            joins: dict[str, tuple[str, str, str]] = {}
+            for ft in reachable_filtered:
+                node = ft
+                while node != base_table and node not in joins:
+                    parent_info = parents[node]
+                    if parent_info is None:
+                        break
+                    joins[node] = parent_info
+                    node = parent_info[0]
+
+            # Assemble the SQL.
+            base_schema, base_entity = table_sources[base_table]
+            sql = f"SELECT `{base_table}`.* FROM {from_location}.{_table_ref(base_schema, base_entity)} AS `{base_table}`"
+
+            # Emit joins in topological order (parents before children)
+            # so every alias is in scope when referenced.
+            emitted: set[str] = set()
+            remaining = dict(joins)
+            while remaining:
+                progress = False
+                for child, (parent, many_c, one_c) in list(remaining.items()):
+                    if parent == base_table or parent in emitted:
+                        if child not in table_sources:
+                            # Should not happen for direct-lake models,
+                            # but guard regardless.
+                            remaining.pop(child)
+                            continue
+                        child_schema, child_entity = table_sources[child]
+                        sql += (
+                            f" INNER JOIN {from_location}.{_table_ref(child_schema, child_entity)} "
+                            f"AS `{child}` ON `{parent}`.`{many_c}` = "
+                            f"`{child}`.`{one_c}`"
+                        )
+                        emitted.add(child)
+                        remaining.pop(child)
+                        progress = True
+                if not progress:
+                    # Defensive: shouldn't happen with a valid tree.
+                    break
+
+            where_parts = []
+            if has_own_filter:
+                where_parts.append(
+                    f"({normalize_filter(filters[base_table], alias=base_table)})"
+                )
+            for ft in reachable_filtered:
+                where_parts.append(f"({normalize_filter(filters[ft], alias=ft)})")
+
+            sql += " WHERE " + " AND ".join(where_parts)
+            queries[base_table] = {
+                "sql": sql,
+                "entityName": to_delta_table_name(base_table),
+                "schema": schema,
+            }
+
+        # Build materialized views for the filtered (and propagated) tables
+        create_schema(name=schema, lakehouse=item_id, workspace=item_workspace_id)
+
+        for table_name, items in queries.items():
+            query = items.get("sql")
+            entity_name = items.get("entityName")
+
+            if schema:
+                name = f"{schema}.{entity_name}"
+            else:
+                name = entity_name
+            create_materialized_lake_view(
+                name=name,
+                query=query,
+                lakehouse=item_id,
+                workspace=item_workspace_id,
+                replace=True,
+            )
+
+            # Repoint partition to new entity
+            # partition_name = next(p.Name for p in self.model.Tables[table_name].Partitions)
+            # self.model.Tables[table_name].Partitions[partition_name].Source.EntityName = entity_name
+
+            # if schema:
+            #    self.model.Tables[table_name].Partitions[partition_name].Source.SchemaName = schema
+
+        return queries
 
     def close(self):
 

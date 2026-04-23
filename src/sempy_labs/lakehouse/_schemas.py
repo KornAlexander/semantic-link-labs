@@ -9,6 +9,7 @@ from sempy_labs._helper_functions import (
     _create_dataframe,
     _base_api,
     resolve_workspace_name_and_id,
+    _create_spark_session,
 )
 import sempy_labs._icons as icons
 
@@ -73,7 +74,7 @@ def list_schemas(
     }
     df = _create_dataframe(columns=columns)
     workspace_id = resolve_workspace_id(workspace)
-    item_id = resolve_lakehouse_id(lakehouse, workspace)
+    item_id = resolve_lakehouse_id(lakehouse=lakehouse, workspace=workspace_id)
     response = _base_api(
         request=f"{workspace_id}/{item_id}/api/2.1/unity-catalog/schemas?catalog_name={item_id}",
         client="onelake",
@@ -100,7 +101,9 @@ def list_tables(
 ) -> pd.DataFrame:
 
     (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
-    (item_name, item_id) = resolve_lakehouse_name_and_id(lakehouse, workspace)
+    (item_name, item_id) = resolve_lakehouse_name_and_id(
+        lakehouse=lakehouse, workspace=workspace_id
+    )
 
     response = _base_api(f"/v1/workspaces/{workspace_id}/lakehouses/{item_id}")
     default_schema = response.json().get("properties", {}).get("defaultSchema", None)
@@ -188,6 +191,7 @@ def list_tables(
     return df
 
 
+@log
 def schema_exists(
     schema: str,
     lakehouse: Optional[str | UUID] = None,
@@ -235,17 +239,23 @@ def create_schema(
     workspace: Optional[str | UUID] = None,
 ):
 
-    from sempy_labs._sql import ConnectLakehouse
-
     (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
     (lakehouse_name, lakehouse_id) = resolve_lakehouse_name_and_id(
         lakehouse=lakehouse, workspace=workspace_id
     )
 
-    if not schema_exists(schema=name, lakehouse=lakehouse_id, workspace=workspace_id):
-        with ConnectLakehouse(lakehouse=lakehouse_id, workspace=workspace_id) as sql:
+    if schema_exists(schema=name, lakehouse=lakehouse_id, workspace=workspace_id):
+        return
 
-            sql.query(f""" CREATE SCHEMA {name}""")
-            print(
-                f"{icons.green_dot} The '{name}' schema has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
-            )
+    default_lakehouse_id = resolve_lakehouse_id(lakehouse=None, workspace=None)
+
+    if lakehouse_id != default_lakehouse_id:
+        raise ValueError(
+            f"{icons.red_dot} Spark only supports creating a schema within the default lakehouse. Switch the default lakehouse to the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
+        )
+
+    spark = _create_spark_session()
+    spark.sql.query(f"""CREATE SCHEMA {name}""")
+    print(
+        f"{icons.green_dot} The '{name}' schema has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
+    )

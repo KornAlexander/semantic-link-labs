@@ -226,4 +226,6 @@ def create_materialized_lake_view(
         df = spark.sql(query)
         return df
 
-    print(f"{icons.green_dot} The materialized lake view '{name}' has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace.")
+    print(
+        f"{icons.green_dot} The materialized lake view '{name}' has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
+    )
