@@ -6096,14 +6096,23 @@ class TOMWrapper:
         # Validation
         if any(p for p in self.all_partitions() if p.Mode != TOM.ModeType.DirectLake):
             print(
-                f"{icons.red_dot} Only Direct Lake partitions are supported for filtering."
+                f"{icons.red_dot} This function only supports semantic models where all tables are in Direct Lake mode."
             )
             return
+
+        all_tables = {t.Name for t in self.model.Tables}
+        for table_name in filters:
+            if table_name not in all_tables:
+                raise ValueError(
+                    f"{icons.red_dot} The '{table_name}' table does not exist in the '{self._dataset_name}' semantic model within the '{self._workspace_name}' workspace."
+                )
 
         sources = self.get_direct_lake_sources()
 
         if len(sources) > 1:
-            print("Multiple Direct Lake sources are not supported for filtering.")
+            print(
+                f"{icons.warning} This function only supports single-sourced Direct Lake semantic models."
+            )
             return
         (item_id, item_name, item_type, item_workspace_id, item_workspace_name) = next(
             (
@@ -6116,7 +6125,7 @@ class TOMWrapper:
             for s in sources
         )
         if item_type != "Lakehouse":
-            print(f"Only supports lakehouse sources.")
+            print(f"{icons.warning} This function only supports lakehouse sources.")
             return
 
         from_location = f"`{item_workspace_name}`.`{item_name}`"
@@ -6150,7 +6159,6 @@ class TOMWrapper:
 
         # Determine, for every table in the model, which filtered tables
         # are reachable via m2o edges (and the join tree leading there).
-        all_tables = {t.Name for t in self.model.Tables}
         filtered_tables = set(filters.keys())
 
         for base_table in all_tables:

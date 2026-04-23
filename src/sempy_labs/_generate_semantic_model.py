@@ -328,7 +328,9 @@ def deploy_semantic_model(
 
             df_added = tom._reduce_model(perspective_name=perspective)
             if filters is not None:
-                queries = tom._create_mlvs_based_on_filters(filters=filters, schema=perspective)
+                queries = tom._create_mlvs_based_on_filters(
+                    filters=filters, schema=perspective
+                )
             bim = tom.get_bim()
 
     else:
