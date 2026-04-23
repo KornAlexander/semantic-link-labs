@@ -2,12 +2,15 @@ from typing import Optional
 import pandas as pd
 from uuid import UUID
 from sempy_labs._helper_functions import (
-    resolve_workspace_id,
+    resolve_workspace_name_and_id,
     _base_api,
     resolve_item_id,
     _create_dataframe,
+    _is_valid_uuid,
 )
 from sempy._utils._log import log
+from sempy_labs.report._items import list_reports
+import sempy_labs._icons as icons
 
 
 @log
@@ -46,10 +49,15 @@ def get_report_datasources(
     }
     df = _create_dataframe(columns=columns)
 
-    workspace_id = resolve_workspace_id(workspace)
-    report_id = resolve_item_id(
-        item=report, type="Report", workspace=workspace_id
-    )
+    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    if _is_valid_uuid(report):
+        report_id = report
+    else:
+        df_reports = list_reports(workspace=workspace_id)
+        df_filt = df_reports[(df_reports['Format'] == 'RDL') & (df_reports['Report Name'] == report)]
+        if df_filt.empty:
+            raise ValueError(f"{icons.red_dot} The '{report}' paginated report does not exist within the '{workspace_name}' workspace.")
+        report_id = df_filt['Report Id'].iloc[0]
 
     response = _base_api(
         request=f"v1.0/myorg/groups/{workspace_id}/reports/{report_id}/datasources",
