@@ -238,6 +238,21 @@ def create_schema(
     lakehouse: Optional[str | UUID] = None,
     workspace: Optional[str | UUID] = None,
 ):
+    """
+    Creates a schema in a Fabric lakehouse. The lakehouse and workspace must be the same as the default lakehouse. This uses a Spark query which is only supported for the default lakehouse.
+
+    Parameters
+    ----------
+    name : str
+        The name of the schema.
+    lakehouse : str | uuid.UUID, default=None
+        The Fabric lakehouse name or ID.
+        Defaults to None which resolves to the lakehouse attached to the notebook.
+    workspace : str | uuid.UUID, default=None
+        The Fabric workspace name or ID used by the lakehouse.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
+    """
 
     (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
     (lakehouse_name, lakehouse_id) = resolve_lakehouse_name_and_id(
