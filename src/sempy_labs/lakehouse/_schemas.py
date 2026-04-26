@@ -9,7 +9,7 @@ from sempy_labs._helper_functions import (
     _create_dataframe,
     _base_api,
     resolve_workspace_name_and_id,
-    _create_spark_session,
+    create_abfss_path,
 )
 import sempy_labs._icons as icons
 
@@ -221,16 +221,6 @@ def schema_exists(
     df = list_schemas(lakehouse=lakehouse, workspace=workspace)
     return schema in df["Schema Name"].values
 
-    # (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
-    # (item_name, item_id) = resolve_lakehouse_name_and_id(lakehouse, workspace)
-    # response = _base_api(
-    #    request=f"{workspace_id}/{item_id}/api/2.1/unity-catalog/schemas/{schema}",
-    #    client="onelake",
-    #    method="head",
-    # )
-
-    # response.json()
-
 
 @log
 def create_schema(
@@ -239,7 +229,7 @@ def create_schema(
     workspace: Optional[str | UUID] = None,
 ):
     """
-    Creates a schema in a Fabric lakehouse. The lakehouse and workspace must be the same as the default lakehouse. This uses a Spark query which is only supported for the default lakehouse.
+    Creates a schema in a Fabric lakehouse.
 
     Parameters
     ----------
@@ -253,6 +243,7 @@ def create_schema(
         Defaults to None which resolves to the workspace of the attached lakehouse
         or if no lakehouse attached, resolves to the workspace of the notebook.
     """
+    import notebookutils
 
     (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
     (lakehouse_name, lakehouse_id) = resolve_lakehouse_name_and_id(
@@ -262,15 +253,10 @@ def create_schema(
     if schema_exists(schema=name, lakehouse=lakehouse_id, workspace=workspace_id):
         return
 
-    default_lakehouse_id = resolve_lakehouse_id(lakehouse=None, workspace=None)
+    path = create_abfss_path(lakehouse_id=lakehouse_id, lakehouse_workspace_id=workspace_id)
 
-    if lakehouse_id != default_lakehouse_id:
-        raise ValueError(
-            f"{icons.red_dot} Spark only supports creating a schema within the default lakehouse. Switch the default lakehouse to the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
-        )
-
-    spark = _create_spark_session()
-    spark.sql.query(f"""CREATE SCHEMA {name}""")
+    path += f"/Tables/{name}"
+    notebookutils.fs.mkdirs(path)
     print(
         f"{icons.green_dot} The '{name}' schema has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
     )
