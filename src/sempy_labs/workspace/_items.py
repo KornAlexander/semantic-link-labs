@@ -576,7 +576,7 @@ def set_git_outbound_policy(
     }
 
     # Check current policy
-    p = get_workspace_git_outbound_policy(workspace=workspace_id)
+    p = get_git_outbound_policy(workspace=workspace_id)
     if p == policy:
         print(
             f"{icons.info} The Git outbound policy for the '{workspace_name}' workspace is already set to '{policy}'. No changes made."

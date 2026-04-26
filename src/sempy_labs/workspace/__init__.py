@@ -15,6 +15,10 @@ from ._items import (
     get_outbound_gateway_rules,
     set_outbound_gateway_rules,
 )
+from ._tags import (
+    apply_workspace_tags,
+    unapply_workspace_tags,
+)
 
 __all__ = [
     "list_workspace_users",
@@ -32,4 +36,6 @@ __all__ = [
     "get_outbound_cloud_connection_rules",
     "get_outbound_gateway_rules",
     "set_outbound_gateway_rules",
+    "apply_workspace_tags",
+    "unapply_workspace_tags",
 ]
