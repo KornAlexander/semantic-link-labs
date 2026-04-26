@@ -6039,9 +6039,12 @@ class TOMWrapper:
 
                 for c in self.all_columns():
                     # if c.LineageTag in list(self._column_map.keys()):
-                    if any(
-                        p.SourceType == TOM.PartitionSourceType.Entity
-                        for p in c.Parent.Partitions
+                    if (
+                        any(
+                            p.Mode == TOM.ModeType.DirectLake
+                            for p in c.Parent.Partitions
+                        )
+                        and c.Type == TOM.ColumnType.Data
                     ):
                         if c.Name != c.SourceColumn:
                             self.add_changed_property(object=c, property="Name")
