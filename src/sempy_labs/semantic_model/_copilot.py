@@ -100,7 +100,7 @@ def set_endorsement(
     )
 
     print(
-        f"{icons.green_dot} The endorsement for the '{item_name}' semantic model within the '{workspace_name}' workspace has been set to '{endorsement}'."
+        f"{icons.green_dot} The endorsement for the '{item_name}' semantic model within the '{workspace_name}' workspace has been set to '{endorsement.title()}'."
     )
 
 
