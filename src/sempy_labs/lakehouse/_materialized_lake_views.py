@@ -202,6 +202,12 @@ def create_materialized_lake_view(
         lakehouse=lakehouse, workspace=workspace_id
     )
 
+    default_workspace_id = resolve_workspace_id()
+    if workspace_id != default_workspace_id:
+        raise ValueError(
+            f"{icons.red_dot} A materialized lake view may only be created if the notebook's default lakehouse is running in a workspace that is the same as the workspace of the materialized lake view. Please ensure that your notebook is attached to a cluster in the same workspace to avoid any connectivity issues."
+        )
+
     name = name.strip()
     parts = name.split(".")
 
