@@ -54,10 +54,14 @@ def get_report_datasources(
         report_id = report
     else:
         df_reports = list_reports(workspace=workspace_id)
-        df_filt = df_reports[(df_reports['Format'] == 'RDL') & (df_reports['Report Name'] == report)]
+        df_filt = df_reports[
+            (df_reports["Format"] == "RDL") & (df_reports["Report Name"] == report)
+        ]
         if df_filt.empty:
-            raise ValueError(f"{icons.red_dot} The '{report}' paginated report does not exist within the '{workspace_name}' workspace.")
-        report_id = df_filt['Report Id'].iloc[0]
+            raise ValueError(
+                f"{icons.red_dot} The '{report}' paginated report does not exist within the '{workspace_name}' workspace."
+            )
+        report_id = df_filt["Report Id"].iloc[0]
 
     response = _base_api(
         request=f"v1.0/myorg/groups/{workspace_id}/reports/{report_id}/datasources",
