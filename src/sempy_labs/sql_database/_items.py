@@ -1,15 +1,18 @@
 from sempy_labs._helper_functions import (
+    resolve_item_name_and_id,
     resolve_workspace_id,
     _base_api,
     _create_dataframe,
     _update_dataframe_datatypes,
     create_item,
     delete_item,
+    resolve_workspace_name_and_id,
 )
 import pandas as pd
 from typing import Optional
 from uuid import UUID
 from sempy._utils._log import log
+import sempy_labs._icons as icons
 
 
 @log
@@ -118,6 +121,103 @@ def list_sql_databases(workspace: Optional[str | UUID] = None) -> pd.DataFrame:
                     "Server FQDN": prop.get("serverFqdn"),
                 }
             )
+
+    if rows:
+        df = pd.DataFrame(rows, columns=list(columns.keys()))
+        _update_dataframe_datatypes(dataframe=df, column_map=columns)
+
+    return df
+
+
+@log
+def revalidate_cmk(sql_database: str | UUID, workspace: Optional[str | UUID] = None):
+    """
+    Revalidates the Customer Managed Key (CMK) for the specified SQL database.
+
+    This is a wrapper function for the following API: `Items - Revalidate CMK <https://learn.microsoft.com/rest/api/fabric/sqldatabase/items/revalidate-cmk>`_.
+
+    Service Principal Authentication is supported (see `here <https://github.com/microsoft/semantic-link-labs/blob/main/notebooks/Service%20Principal.ipynb>`_ for examples).
+
+    Parameters
+    ----------
+    sql_database: str | uuid.UUID
+        Name of the SQL database.
+    workspace : str | uuid.UUID, default=None
+        The Fabric workspace name or ID.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
+    """
+
+    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    (item_name, item_id) = resolve_item_name_and_id(
+        item=sql_database, type="SQLDatabase", workspace=workspace_id
+    )
+
+    _base_api(
+        request=f"/v1/workspaces/{workspace_id}/sqlDatabases/{item_id}/revalidateCMK",
+        method="post",
+        lro_return_status_code=True,
+        status_codes=[200, 202],
+    )
+
+    print(
+        f"{icons.green_dot} CMK has been revalidated for the '{item_name}' SQL database within the '{workspace_name}' workspace."
+    )
+
+
+@log
+def list_restorable_deleted_databases(
+    workspace: Optional[str | UUID] = None,
+) -> pd.DataFrame:
+    """
+    Lists restorable deleted SQL databases in the Fabric workspace.
+
+    This is a wrapper function for the following API: `Items - List Restorable Deleted SQL Databases <https://learn.microsoft.com/rest/api/fabric/sqldatabase/items/list-restorable-deleted-sql-databases>`_.
+
+    Service Principal Authentication is supported (see `here <https://github.com/microsoft/semantic-link-labs/blob/main/notebooks/Service%20Principal.ipynb>`_ for examples).
+
+    Parameters
+    ----------
+    workspace : str | uuid.UUID, default=None
+        The Fabric workspace name or ID.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
+    
+    Returns
+    -------
+    pandas.DataFrame
+        A pandas dataframe showing a list of restorable deleted SQL databases in the Fabric workspace.
+    """
+
+    workspace_id = resolve_workspace_id(workspace)
+
+    columns = {
+        "SQL Database Name": "string",
+        "Restorable Deleted Database Name": "string",
+        "Earliest Restore Point": "datetime",
+        "Latest Restore Point": "datetime",
+        "Deletion Timestamp": "datetime",
+    }
+    df = _create_dataframe(columns=columns)
+
+    response = _base_api(
+        request=f"/v1/workspaces/{workspace_id}/sqlDatabases/restorableDeletedDatabases",
+    )
+
+    rows = []
+    for v in response.json().get("value", []):
+        prop = v.get("properties", {})
+        rows.append(
+            {
+                "SQL Database Name": v.get("displayName"),
+                "Restorable Deleted Database Name": prop.get(
+                    "restorableDeletedDatabaseName"
+                ),
+                "Earliest Restore Point": prop.get("earliestRestorePoint"),
+                "Latest Restore Point": prop.get("latestRestorePoint"),
+                "Deletion Timestamp": prop.get("deletionTimestamp"),
+            }
+        )
 
     if rows:
         df = pd.DataFrame(rows, columns=list(columns.keys()))
