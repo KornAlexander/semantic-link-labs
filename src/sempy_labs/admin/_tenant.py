@@ -33,6 +33,11 @@ def list_tenant_settings() -> pd.DataFrame:
         "Can Specify Security Groups": "bool",
         "Tenant Setting Group": "string",
         "Enabled Security Groups": "list",
+        "Excluded Security Groups": "list",
+        "Delegate To Capacity": "bool",
+        "Delegate To Workspace": "bool",
+        "Delegate To Domain": "bool",
+        "Properties": "list",
     }
     df = _create_dataframe(columns=columns)
 
@@ -48,6 +53,11 @@ def list_tenant_settings() -> pd.DataFrame:
                 "Can Specify Security Groups": i.get("canSpecifySecurityGroups"),
                 "Tenant Setting Group": i.get("tenantSettingGroup"),
                 "Enabled Security Groups": i.get("enabledSecurityGroups", []),
+                "Excluded Security Groups": i.get("excludedSecurityGroups", []),
+                "Delegate To Capacity": i.get("delegateToCapacity"),
+                "Delegate To Workspace": i.get("delegateToWorkspace"),
+                "Delegate To Domain": i.get("delegateToDomain"),
+                "Properties": i.get("properties", []),
             }
         )
 
