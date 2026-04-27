@@ -52,13 +52,7 @@ class TOMWrapper:
     _tables_added: List[str]
     _table_map = dict
     _column_map = dict
-    _dax_formatting = {
-        "measures": [],
-        "calculated_columns": [],
-        "calculated_tables": [],
-        "calculation_items": [],
-        "rls": [],
-    }
+    _dax_formatting = dict
 
     def __init__(self, dataset, workspace, readonly):
 
@@ -67,6 +61,13 @@ class TOMWrapper:
         prefix_full = f"{prefix}://"
         read_write = ":rw"
         self._token_provider = auth.token_provider.get()
+        self._dax_formatting = {
+            "measures": [],
+            "calculated_columns": [],
+            "calculated_tables": [],
+            "calculation_items": [],
+            "rls": [],
+        }
 
         # Azure AS workspace logic
         if workspace is not None and workspace.startswith(prefix_full):
@@ -6039,9 +6040,12 @@ class TOMWrapper:
 
                 for c in self.all_columns():
                     # if c.LineageTag in list(self._column_map.keys()):
-                    if any(
-                        p.SourceType == TOM.PartitionSourceType.Entity
-                        for p in c.Parent.Partitions
+                    if (
+                        any(
+                            p.Mode == TOM.ModeType.DirectLake
+                            for p in c.Parent.Partitions
+                        )
+                        and c.Type == TOM.ColumnType.Data
                     ):
                         if c.Name != c.SourceColumn:
                             self.add_changed_property(object=c, property="Name")

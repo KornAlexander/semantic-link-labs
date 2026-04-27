@@ -59,5 +59,5 @@ def set_endorsement(
     )
 
     print(
-        f"{icons.green_dot} The endorsement for the '{report_name}' report within the '{workspace_name}' workspace has been set to '{endorsement}'."
+        f"{icons.green_dot} The endorsement for the '{report_name}' report within the '{workspace_name}' workspace has been set to '{endorsement.title()}'."
     )
