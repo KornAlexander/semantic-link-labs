@@ -9,6 +9,7 @@ from sempy_labs._helper_functions import (
     _create_dataframe,
     _base_api,
     resolve_workspace_name_and_id,
+    create_abfss_path,
 )
 import sempy_labs._icons as icons
 
@@ -73,7 +74,7 @@ def list_schemas(
     }
     df = _create_dataframe(columns=columns)
     workspace_id = resolve_workspace_id(workspace)
-    item_id = resolve_lakehouse_id(lakehouse, workspace)
+    item_id = resolve_lakehouse_id(lakehouse=lakehouse, workspace=workspace_id)
     response = _base_api(
         request=f"{workspace_id}/{item_id}/api/2.1/unity-catalog/schemas?catalog_name={item_id}",
         client="onelake",
@@ -100,7 +101,9 @@ def list_tables(
 ) -> pd.DataFrame:
 
     (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
-    (item_name, item_id) = resolve_lakehouse_name_and_id(lakehouse, workspace)
+    (item_name, item_id) = resolve_lakehouse_name_and_id(
+        lakehouse=lakehouse, workspace=workspace_id
+    )
 
     response = _base_api(f"/v1/workspaces/{workspace_id}/lakehouses/{item_id}")
     default_schema = response.json().get("properties", {}).get("defaultSchema", None)
@@ -188,6 +191,7 @@ def list_tables(
     return df
 
 
+@log
 def schema_exists(
     schema: str,
     lakehouse: Optional[str | UUID] = None,
@@ -217,12 +221,42 @@ def schema_exists(
     df = list_schemas(lakehouse=lakehouse, workspace=workspace)
     return schema in df["Schema Name"].values
 
-    # (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
-    # (item_name, item_id) = resolve_lakehouse_name_and_id(lakehouse, workspace)
-    # response = _base_api(
-    #    request=f"{workspace_id}/{item_id}/api/2.1/unity-catalog/schemas/{schema}",
-    #    client="onelake",
-    #    method="head",
-    # )
 
-    # response.json()
+@log
+def create_schema(
+    name: str,
+    lakehouse: Optional[str | UUID] = None,
+    workspace: Optional[str | UUID] = None,
+):
+    """
+    Creates a schema in a Fabric lakehouse.
+
+    Parameters
+    ----------
+    name : str
+        The name of the schema.
+    lakehouse : str | uuid.UUID, default=None
+        The Fabric lakehouse name or ID.
+        Defaults to None which resolves to the lakehouse attached to the notebook.
+    workspace : str | uuid.UUID, default=None
+        The Fabric workspace name or ID used by the lakehouse.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
+    """
+    import notebookutils
+
+    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    (lakehouse_name, lakehouse_id) = resolve_lakehouse_name_and_id(
+        lakehouse=lakehouse, workspace=workspace_id
+    )
+
+    if schema_exists(schema=name, lakehouse=lakehouse_id, workspace=workspace_id):
+        return
+
+    path = create_abfss_path(lakehouse_id=lakehouse_id, lakehouse_workspace_id=workspace_id)
+
+    path += f"/Tables/{name}"
+    notebookutils.fs.mkdirs(path)
+    print(
+        f"{icons.green_dot} The '{name}' schema has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
+    )

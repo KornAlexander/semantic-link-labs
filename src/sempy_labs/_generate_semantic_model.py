@@ -253,6 +253,7 @@ def deploy_semantic_model(
     refresh_target_dataset: bool = True,
     overwrite: bool = False,
     perspective: Optional[str] = None,
+    filters: Optional[dict] = None,
 ):
     """
     Deploys a semantic model based on an existing semantic model.
@@ -277,6 +278,13 @@ def deploy_semantic_model(
         If set to True, overwrites the existing semantic model in the workspace if it exists.
     perspective : str, default=None
         Set this to the name of a perspective in the model and it will reduce the deployed model down to the tables/columns/measures/hierarchies within that perspective.
+    filters : dict, default=None
+        Filters to apply to the target semantic model. See the example below. If filters are specified, a perspective must also be specified.
+
+        filters = {
+            "Geography": "City = 'Verdery' ",
+            "Sales": "SaleKey > 100",
+        }
     """
 
     (source_workspace_name, source_workspace_id) = resolve_workspace_name_and_id(
@@ -306,6 +314,11 @@ def deploy_semantic_model(
             f"{icons.warning} The '{target_dataset}' semantic model already exists within the '{target_workspace_name}' workspace. The 'overwrite' parameter is set to False so the source semantic model was not deployed to the target destination."
         )
 
+    if filters is not None and perspective is None:
+        raise ValueError(
+            "If filters are specified, a perspective must also be specified."
+        )
+
     if perspective is not None:
         from sempy_labs.tom import connect_semantic_model
 
@@ -314,6 +327,10 @@ def deploy_semantic_model(
         ) as tom:
 
             df_added = tom._reduce_model(perspective_name=perspective)
+            if filters is not None:
+                queries = tom._create_mlvs_based_on_filters(
+                    filters=filters, schema=perspective
+                )
             bim = tom.get_bim()
 
     else:
@@ -333,6 +350,25 @@ def deploy_semantic_model(
         update_semantic_model_from_bim(
             dataset=target_dataset, bim_file=bim, workspace=target_workspace_id
         )
+
+    # Update the entities of the partitions in the target semantic model if filters were applied
+    if filters is not None:
+        with connect_semantic_model(
+            dataset=target_dataset, workspace=target_workspace_id, readonly=False
+        ) as tom:
+            for table_name, items in queries.items():
+                entity_name = items.get("entityName")
+                schema_name = items.get("schema")
+                partition_name = next(
+                    p.Name for p in tom.model.Tables[table_name].Partitions
+                )
+                tom.model.Tables[table_name].Partitions[
+                    partition_name
+                ].Source.EntityName = entity_name
+                if schema_name:
+                    tom.model.Tables[table_name].Partitions[
+                        partition_name
+                    ].Source.SchemaName = schema_name
 
     if refresh_target_dataset:
         refresh_semantic_model(dataset=target_dataset, workspace=target_workspace_id)

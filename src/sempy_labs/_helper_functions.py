@@ -22,6 +22,7 @@ from jsonpath_ng.jsonpath import Fields, Index
 from sempy._utils._log import log
 from os import PathLike
 import sempy_labs._utils as utils
+import unicodedata
 
 
 def _build_url(url: str, params: dict) -> str:
@@ -2465,7 +2466,7 @@ def _pure_python_notebook() -> bool:
 def _create_spark_session():
 
     if _pure_python_notebook():
-        raise ValueError(
+        raise EnvironmentError(
             f"{icons.red_dot} This function is only available in a PySpark notebook."
         )
 
@@ -2897,3 +2898,83 @@ def get_model_id(item_id: UUID, prefix: str = None, headers: dict = None):
     response = _base_api(request=f"metadata/models/{item_id}", client="internal")
 
     return response.json().get("model", {}).get("id")
+
+
+def normalize_filter(f, alias=None):
+    """Normalize a user-supplied filter expression.
+
+    When ``alias`` is provided, bracketed column references ``[Col]`` are
+    rewritten as ```alias`.`Col``` so the filter is unambiguous in a
+    multi-table (joined) query. When no alias is given the brackets are
+    simply stripped to preserve the original single-table behavior.
+    """
+
+    # Remove extra whitespace
+    f = f.strip()
+
+    # Replace == with =
+    f = re.sub(r"==", "=", f)
+
+    # Square bracketed column references
+    if alias:
+        f = re.sub(r"\[(.*?)\]", rf"`{alias}`.`\1`", f)
+    else:
+        f = re.sub(r"\[(.*?)\]", r"\1", f)
+
+    # Convert double quotes to single quotes
+    f = re.sub(r'"(.*?)"', r"'\1'", f)
+
+    return f
+
+
+def _table_ref(schema_name, entity_name):
+    """Return a fully-qualified, safely quoted table reference."""
+
+    entity_sql = f"`{entity_name}`" if " " in entity_name else entity_name
+    if schema_name:
+        return f"{schema_name}.{entity_sql}"
+    return entity_sql
+
+
+def to_delta_table_name(name: str, max_length: int = 128) -> str:
+    """
+    Convert an arbitrary string into a Fabric Lakehouse-safe Delta table name.
+
+    Rules enforced:
+    - lowercase
+    - only a-z, 0-9, underscore
+    - no leading digit
+    - no consecutive underscores
+    - trimmed to max_length
+    """
+    if not name or not isinstance(name, str):
+        raise ValueError("Name must be a non-empty string")
+
+    # Normalize unicode (e.g., é → e)
+    name = unicodedata.normalize("NFKD", name)
+    name = name.encode("ascii", "ignore").decode("ascii")
+
+    # Lowercase
+    name = name.lower()
+
+    # Replace invalid characters with underscore
+    name = re.sub(r"[^a-z0-9_]", "_", name)
+
+    # Collapse multiple underscores
+    name = re.sub(r"_+", "_", name)
+
+    # Trim underscores from ends
+    name = name.strip("_")
+
+    # Ensure not empty after cleaning
+    if not name:
+        name = "table"
+
+    # Prevent leading digit
+    if name[0].isdigit():
+        name = f"t_{name}"
+
+    # Enforce max length
+    name = name[:max_length]
+
+    return name

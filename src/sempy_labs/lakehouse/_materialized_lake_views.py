@@ -1,10 +1,11 @@
-from typing import Optional
+from typing import List, Optional
 from sempy_labs._helper_functions import (
     resolve_workspace_id,
     resolve_workspace_name_and_id,
     resolve_lakehouse_name_and_id,
     _base_api,
     _create_dataframe,
+    _create_spark_session,
 )
 from uuid import UUID
 from sempy._utils._log import log
@@ -155,4 +156,82 @@ def _delete_materialized_lake_view_schedule(
 
     print(
         f"{icons.green_dot} The materialized lake view schedule with ID '{schedule_id}' has been deleted from the '{lakehouse_name}' lakehouse within the '{workspace_id}' workspace."
+    )
+
+
+@log
+def create_materialized_lake_view(
+    name: str,
+    query: str,
+    lakehouse: Optional[str | UUID] = None,
+    workspace: Optional[str | UUID] = None,
+    replace: bool = False,
+    partition_columns: List[str] = None,
+):
+    """
+    Creates a materialized lake view within a lakehouse.
+
+    Requirements: This function must be executed in a PySpark notebook.
+
+    Parameters
+    ----------
+    name : str
+        The name of the materialized lake view (not including the lakehouse or workspace names). For schema-enabled lakehouses, include the name in schema_name.view_name format.
+    query : str
+        The SQL query that defines the materialized lake view. The query must be a valid SQL query that can be executed in the context of the lakehouse.
+    lakehouse : str | uuid.UUID, default=None
+        The Fabric lakehouse name or ID.
+        Defaults to None which resolves to the lakehouse attached to the notebook.
+    workspace : str | uuid.UUID, default=None
+        The Fabric workspace name or ID used by the lakehouse.
+        Defaults to None which resolves to the workspace of the attached lakehouse
+        or if no lakehouse attached, resolves to the workspace of the notebook.
+    replace : bool, default=False
+        If True, it will replace the existing materialized lake view if one exists.
+    partition_columns : typing.List[str], default=None
+        The columns to partition the materialized lake view by.
+    """
+
+    import fmlv
+    from sempy_labs.lakehouse._schemas import create_schema
+
+    spark = _create_spark_session()
+
+    (workspace_name, workspace_id) = resolve_workspace_name_and_id(workspace)
+    (lakehouse_name, lakehouse_id) = resolve_lakehouse_name_and_id(
+        lakehouse=lakehouse, workspace=workspace_id
+    )
+
+    default_workspace_id = resolve_workspace_id()
+    if workspace_id != default_workspace_id:
+        raise ValueError(
+            f"{icons.red_dot} A materialized lake view may only be created if the notebook's default lakehouse is running in a workspace that is the same as the workspace of the materialized lake view. Please ensure that your notebook is attached to a cluster in the same workspace to avoid any connectivity issues."
+        )
+
+    name = name.strip()
+    parts = name.split(".")
+
+    if len(parts) == 2:
+        schema_name, _ = parts
+    elif len(parts) == 1:
+        schema_name = None
+        #  table_name = parts[0]
+    else:
+        raise ValueError(f"Invalid table name format: {name}")
+
+    if schema_name:
+        create_schema(name=schema_name, lakehouse=lakehouse_id, workspace=workspace_id)
+
+    @fmlv.materialized_lake_view(
+        name=f"`{workspace_name}`.`{lakehouse_name}`.{name}",
+        partition_cols=partition_columns,
+        #  table_properties={"delta.enableChangeDataFeed": "true"}
+        replace=replace,
+    )
+    def view():
+        df = spark.sql(query)
+        return df
+
+    print(
+        f"{icons.green_dot} The materialized lake view '{name}' has been created in the '{lakehouse_name}' lakehouse within the '{workspace_name}' workspace."
     )
