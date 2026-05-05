@@ -8,21 +8,26 @@ from sempy._utils._log import log
 
 @log
 def fix_trim_object_names(
-    dataset: str,
+    dataset: str | UUID,
     workspace: Optional[str | UUID] = None,
     scan_only: bool = False,
-):
+) -> int:
     """
     Trims leading/trailing whitespace from table, column, measure, hierarchy, and partition names.
 
     Parameters
     ----------
-    dataset : str
-        Name of the semantic model.
+    dataset : str | UUID
+        Name or ID of the semantic model.
     workspace : str | uuid.UUID, default=None
         The Fabric workspace name or ID.
     scan_only : bool, default=False
         If True, only reports what would be fixed without making changes.
+
+    Returns
+    -------
+    int
+        Number of items fixed.
     """
     from sempy_labs.tom import connect_semantic_model
 
@@ -69,8 +74,8 @@ def fix_trim_object_names(
                             p.Name = p.Name.strip()
                             print(f"  Trimmed partition: {p.Name}")
                         fixed += 1
-            except Exception:
-                pass
+            except (AttributeError, RuntimeError) as e:
+                print(f\"  Skipped (error: {e})\")
 
     action = "Would trim" if scan_only else "Trimmed"
     print(f"  {action} {fixed} object name(s).")
