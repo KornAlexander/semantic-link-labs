@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Add_CalcGroup_Units import add_calc_group_units
+__all__ += ["add_calc_group_units"]
