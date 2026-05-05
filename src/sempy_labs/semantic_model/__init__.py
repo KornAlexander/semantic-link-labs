@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Add_IncrementalRefresh import add_incremental_refresh
+__all__ += ["add_incremental_refresh"]
