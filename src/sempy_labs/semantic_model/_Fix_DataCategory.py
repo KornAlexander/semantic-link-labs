@@ -9,10 +9,10 @@ from sempy._utils._log import log
 
 @log
 def fix_data_category(
-    dataset: str,
+    dataset: str | UUID,
     workspace: Optional[str | UUID] = None,
     scan_only: bool = False,
-):
+) -> int:
     """
     Sets appropriate DataCategory on columns based on naming conventions.
 
@@ -22,12 +22,17 @@ def fix_data_category(
 
     Parameters
     ----------
-    dataset : str
-        Name of the semantic model.
+    dataset : str | UUID
+        Name or ID of the semantic model.
     workspace : str | uuid.UUID, default=None
         The Fabric workspace name or ID.
     scan_only : bool, default=False
         If True, only reports what would be fixed without making changes.
+
+    Returns
+    -------
+    int
+        Number of items fixed.
     """
     from sempy_labs.tom import connect_semantic_model
 
@@ -39,7 +44,7 @@ def fix_data_category(
         (r"\bcontinent\b", "Continent"),
         (r"\blatitude\b|\blat\b", "Latitude"),
         (r"\blongitude\b|\blon\b|\blng\b", "Longitude"),
-        (r"\burl\b|\bweb\s*url\b|\bwebsite\b|\blink\b", "WebUrl"),
+        (r"\burl\b|\bweb\s*url\b|\bwebsite\b|\blink\b", "WebURL"),
         (r"\bimage\s*url\b|\bimage\b|\bthumbnail\b|\bphoto\b|\bpicture\b", "ImageUrl"),
         (r"\baddress\b", "Address"),
         (r"\bcounty\b", "County"),
