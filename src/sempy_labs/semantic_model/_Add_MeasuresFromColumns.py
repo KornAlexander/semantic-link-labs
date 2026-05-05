@@ -104,8 +104,6 @@ def add_measures_from_columns(
                     f"in '{dest_table.Name}'"
                 )
 
-        if not scan_only and created > 0:
-            tom.model.SaveChanges()
 
     action = "Would create" if scan_only else "Created"
     print(f"{icons.info} {action} {created} measure(s) from columns.")
