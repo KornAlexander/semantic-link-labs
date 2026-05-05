@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_VisualAlignment import fix_visual_alignment
+__all__ += ["fix_visual_alignment"]
