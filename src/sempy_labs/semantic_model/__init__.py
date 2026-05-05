@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Add_CalculatedTable_MeasureTable import add_measure_table
+__all__ += ["add_measure_table"]
