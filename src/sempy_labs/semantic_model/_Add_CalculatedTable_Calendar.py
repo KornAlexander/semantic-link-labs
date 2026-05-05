@@ -1,5 +1,4 @@
 # Add Calculated Calendar Table to Semantic Model
-# %pip install semantic-link-labs
 
 from uuid import UUID
 from typing import Optional
@@ -206,7 +205,6 @@ def add_calculated_calendar(
 
         # 4. Intermediate save — server must assign column IDs before
         #    hierarchies can reference them.
-        tom.model.SaveChanges()
 
         # 4b. Re-apply display folders AFTER SaveChanges — the server
         #     regenerates CalculatedTableColumn objects during save and
