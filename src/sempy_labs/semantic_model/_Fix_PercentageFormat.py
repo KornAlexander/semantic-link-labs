@@ -3,8 +3,10 @@
 from typing import Optional
 from uuid import UUID
 import re
+from sempy._utils._log import log
 
 
+@log
 def fix_percentage_format(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -42,8 +44,6 @@ def fix_percentage_format(
                     m.FormatString = _PCT_FMT
                     print(f"  Fixed: [{m.Name}] → {_PCT_FMT}")
                 fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would fix" if scan_only else "Fixed"
     print(f"  {action} {fixed} percentage measure(s).")
