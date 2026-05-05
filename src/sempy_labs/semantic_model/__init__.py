@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_HideForeignKeys import fix_hide_foreign_keys
+__all__ += ["fix_hide_foreign_keys"]
