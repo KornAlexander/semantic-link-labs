@@ -4,8 +4,10 @@
 from typing import Optional
 from uuid import UUID
 import re
+from sempy._utils._log import log
 
 
+@log
 def fix_avoid_adding_zero(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -40,8 +42,6 @@ def fix_avoid_adding_zero(
                             m.Expression = new_expr
                             print(f"  Fixed: [{m.Name}] — removed '0+' prefix")
                         fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would fix" if scan_only else "Fixed"
     print(f"  {action} {fixed} measure(s).")
