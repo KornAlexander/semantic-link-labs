@@ -2,8 +2,10 @@
 
 from typing import Optional
 from uuid import UUID
+from sempy._utils._log import log
 
 
+@log
 def fix_flag_column_format(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -49,8 +51,6 @@ def fix_flag_column_format(
                     col.FormatString = _FLAG_FMT
                     print(f"  Fixed: '{table.Name}'[{col.Name}] → Yes/No format")
                 fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would fix" if scan_only else "Fixed"
     print(f"  {action} {fixed} flag column(s).")
