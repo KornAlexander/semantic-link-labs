@@ -3,8 +3,10 @@
 
 from typing import Optional
 from uuid import UUID
+from sempy._utils._log import log
 
 
+@log
 def fix_trim_object_names(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -69,8 +71,6 @@ def fix_trim_object_names(
                         fixed += 1
             except Exception:
                 pass
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would trim" if scan_only else "Trimmed"
     print(f"  {action} {fixed} object name(s).")
