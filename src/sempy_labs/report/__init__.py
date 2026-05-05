@@ -41,6 +41,7 @@ from ._items import (
     list_reports,
     get_report,
 )
+from ._Fix_IBCSVariance import fix_ibcs_variance
 
 __all__ = [
     "create_report_from_reportjson",
@@ -66,7 +67,5 @@ __all__ = [
     "upgrade_to_pbir",
     "list_reports",
     "get_report",
+    "fix_ibcs_variance",
 ]
-
-from ._Fix_IBCSVariance import fix_ibcs_variance
-__all__ += ["fix_ibcs_variance"]

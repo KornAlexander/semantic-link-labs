@@ -627,7 +627,6 @@ def fix_ibcs_variance(
                 existing_measures[name] = (tbl, expr)
                 print(f"  {icons.green_dot} Created [{name}]")
 
-            tom.model.SaveChanges()
         print(f"{icons.green_dot} {len(measures_to_create)} measure(s) created.")
 
         # Recalculate the model so PY measures can resolve
