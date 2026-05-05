@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_PercentageFormat import fix_percentage_format
+__all__ += ["fix_percentage_format"]
