@@ -9,21 +9,26 @@ from sempy._utils._log import log
 
 @log
 def fix_avoid_adding_zero(
-    dataset: str,
+    dataset: str | UUID,
     workspace: Optional[str | UUID] = None,
     scan_only: bool = False,
-):
+) -> int:
     """
     Removes '0+' or '0 +' prefix from measure expressions.
 
     Parameters
     ----------
-    dataset : str
-        Name of the semantic model.
+    dataset : str | UUID
+        Name or ID of the semantic model.
     workspace : str | uuid.UUID, default=None
         The Fabric workspace name or ID.
     scan_only : bool, default=False
         If True, only reports what would be fixed without making changes.
+
+    Returns
+    -------
+    int
+        Number of items fixed.
     """
     from sempy_labs.tom import connect_semantic_model
 
