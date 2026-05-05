@@ -4,8 +4,10 @@
 from typing import Optional
 from uuid import UUID
 import re
+from sempy._utils._log import log
 
 
+@log
 def fix_sort_month_column(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -63,8 +65,6 @@ def fix_sort_month_column(
                     mc.SortByColumn = sort_col
                     print(f"  Fixed: '{table.Name}'[{mc.Name}] SortByColumn → [{sort_col.Name}]")
                 fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would fix" if scan_only else "Fixed"
     print(f"  {action} {fixed} month column(s).")
