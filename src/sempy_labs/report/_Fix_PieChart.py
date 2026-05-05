@@ -1,5 +1,4 @@
 # Fix Pie Chart Visuals in Power BI Reports
-# %pip install semantic-link-labs
 
 from uuid import UUID
 from typing import Optional
