@@ -9,10 +9,10 @@ from sempy._utils._log import log
 
 @log
 def fix_sort_month_column(
-    dataset: str,
+    dataset: str | UUID,
     workspace: Optional[str | UUID] = None,
     scan_only: bool = False,
-):
+) -> int:
     """
     Sets SortByColumn on month name (string) columns to point to a month number column.
 
@@ -21,12 +21,17 @@ def fix_sort_month_column(
 
     Parameters
     ----------
-    dataset : str
-        Name of the semantic model.
+    dataset : str | UUID
+        Name or ID of the semantic model.
     workspace : str | uuid.UUID, default=None
         The Fabric workspace name or ID.
     scan_only : bool, default=False
         If True, only reports what would be fixed without making changes.
+
+    Returns
+    -------
+    int
+        Number of items fixed.
     """
     from sempy_labs.tom import connect_semantic_model
 
