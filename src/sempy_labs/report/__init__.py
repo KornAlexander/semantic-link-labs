@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_PieChart import fix_pie_chart
+__all__ += ["fix_pie_chart"]
