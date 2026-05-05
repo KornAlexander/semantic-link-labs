@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_DoNotSummarize import fix_do_not_summarize
+__all__ += ["fix_do_not_summarize"]
