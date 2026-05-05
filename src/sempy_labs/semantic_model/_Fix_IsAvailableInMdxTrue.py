@@ -2,8 +2,10 @@
 
 from typing import Optional
 from uuid import UUID
+from sempy._utils._log import log
 
 
+@log
 def fix_isavailable_in_mdx_true(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -49,8 +51,6 @@ def fix_isavailable_in_mdx_true(
                         col.IsAvailableInMDX = True
                         print(f"  Fixed: '{table.Name}'[{col.Name}] IsAvailableInMDX → True")
                     fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would fix" if scan_only else "Fixed"
     print(f"  {action} {fixed} column(s).")
