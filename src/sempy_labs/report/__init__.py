@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_ColumnChart import fix_column_chart
+__all__ += ["fix_column_chart"]
