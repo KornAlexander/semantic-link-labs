@@ -72,7 +72,7 @@ def add_last_refresh_table(
 
         # Fuzzy match: any table whose name contains "refresh"
         refresh_tables = [
-            t.Name for t in tom.model.Tables if "refresh" in t.Name.lower()
+            t.Name for t in tom.model.Tables if t.Name == _LR_TABLE_NAME
         ]
 
         if refresh_tables:
@@ -126,7 +126,7 @@ def add_last_refresh_table(
 
         # 4. Add the measure — prefer the "Measure" table if it exists
         measure_tables = [
-            t.Name for t in tom.model.Tables if "measure" in t.Name.lower()
+            t.Name for t in tom.model.Tables if t.Name.lower() in {'measures', 'measure', 'measure table', 'measure_table'}
         ]
         measure_target = measure_tables[0] if measure_tables else _LR_TABLE_NAME
 
