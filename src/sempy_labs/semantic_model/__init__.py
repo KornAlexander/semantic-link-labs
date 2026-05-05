@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_AvoidAdding0 import fix_avoid_adding_zero
+__all__ += ["fix_avoid_adding_zero"]
