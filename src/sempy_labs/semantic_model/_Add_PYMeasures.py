@@ -158,8 +158,6 @@ def add_py_measures(
             if not scan_only:
                 print(f"{icons.green_dot} Created PY variants for [{name}]")
 
-        if not scan_only and created > 0:
-            tom.model.SaveChanges()
 
     action = "Would create" if scan_only else "Created"
     print(f"{icons.info} {action} {created} PY measure(s) from {len(source_measures)} source measure(s).")
