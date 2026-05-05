@@ -3,6 +3,7 @@
 
 from typing import Optional
 from uuid import UUID
+from sempy._utils._log import log
 
 
 # Chart visual types to check for alignment (actual data chart visuals only)
@@ -15,6 +16,7 @@ _CHART_TYPES = {
 }
 
 
+@log
 def fix_visual_alignment(
     report: str,
     page_name: Optional[str] = None,
@@ -43,8 +45,6 @@ def fix_visual_alignment(
         the page width/height are considered "nearly aligned" and will be snapped.
     """
     from sempy_labs.report import connect_report
-    import pandas as pd
-
     total_fixes = 0
 
     with connect_report(report=report, readonly=scan_only, workspace=workspace) as rw:
