@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_BarChart import fix_bar_chart
+__all__ += ["fix_bar_chart"]
