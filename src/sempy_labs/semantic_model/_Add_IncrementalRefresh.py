@@ -10,7 +10,7 @@ from sempy._utils._log import log
 
 @log
 def add_incremental_refresh(
-    dataset: str,
+    dataset: str | UUID,
     table_name: str,
     workspace: Optional[str | UUID] = None,
     column_name: Optional[str] = None,
@@ -26,8 +26,8 @@ def add_incremental_refresh(
 
     Parameters
     ----------
-    dataset : str
-        Name of the semantic model.
+    dataset : str | UUID
+        Name or ID of the semantic model.
     table_name : str
         Name of the table to configure.
     workspace : str | uuid.UUID, default=None
@@ -43,6 +43,10 @@ def add_incremental_refresh(
     scan_only : bool, default=False
         If True, only reports what would be configured without making changes.
     """
+    if rolling_window_years < 1:
+        raise ValueError(f"rolling_window_years must be >= 1, got {rolling_window_years}")
+    if incremental_days < 1:
+        raise ValueError(f"incremental_days must be >= 1, got {incremental_days}")
     from sempy_labs.tom import connect_semantic_model
 
     with connect_semantic_model(dataset=dataset, readonly=scan_only, workspace=workspace) as tom:
