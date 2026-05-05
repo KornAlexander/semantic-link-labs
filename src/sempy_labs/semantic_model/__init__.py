@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_CapitalizeObjectNames import fix_capitalize_object_names
+__all__ += ["fix_capitalize_object_names"]
