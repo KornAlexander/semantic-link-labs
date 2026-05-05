@@ -379,10 +379,10 @@ def generate_prep_for_ai_text(
                 if t.CalculationGroup is not None:
                     calc_tables.append(t_name)
                     continue
-            except Exception:
+            except AttributeError:
                 pass
             # Detect measure-only tables (no columns besides RowNumber)
-            real_cols = [c for c in t.Columns if str(c.Name) != "RowNumber-2662979B-1795-4F74-8F37-6A1BA8059B61"]
+            real_cols = [c for c in t.Columns if not str(c.Name).startswith('RowNumber-')]
             has_measures = any(True for _ in t.Measures)
             if len(real_cols) == 0 and has_measures:
                 measure_table = t_name
@@ -467,7 +467,7 @@ def generate_prep_for_ai_text(
             t_name = str(t.Name)
             for c in t.Columns:
                 c_name = str(c.Name)
-                if c_name == "RowNumber-2662979B-1795-4F74-8F37-6A1BA8059B61":
+                if c_name.startswith('RowNumber-'):
                     continue
                 desc = str(c.Description).strip() if c.Description else ""
                 if desc:
