@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Add_PrepForAI import add_prep_for_ai
+__all__ += ["add_prep_for_ai"]
