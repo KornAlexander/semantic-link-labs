@@ -82,6 +82,9 @@ def fix_bar_chart(
     scan_only: bool = False,
     rules: Optional[Iterable[str]] = None,
 ) -> None:
+    # Normalize `rules` if a single string was passed
+    if isinstance(rules, str):
+        rules = [rules]
     """
     Apply IBCS-friendly formatting to bar chart (`barChart`, `clusteredBarChart`) visuals.
 
