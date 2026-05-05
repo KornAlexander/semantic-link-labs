@@ -1,5 +1,4 @@
 # Fix Line Chart Visuals in Power BI Reports (IBCS-friendly defaults)
-# %pip install semantic-link-labs
 
 from uuid import UUID
 from typing import Optional, Iterable
