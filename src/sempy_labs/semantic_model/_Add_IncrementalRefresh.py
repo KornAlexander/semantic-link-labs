@@ -5,8 +5,10 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime, timedelta
 import re
+from sempy._utils._log import log
 
 
+@log
 def add_incremental_refresh(
     dataset: str,
     table_name: str,
