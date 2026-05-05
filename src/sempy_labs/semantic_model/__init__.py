@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_MarkPrimaryKeys import fix_mark_primary_keys
+__all__ += ["fix_mark_primary_keys"]
