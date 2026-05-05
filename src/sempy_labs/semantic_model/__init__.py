@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_DateColumnFormat import fix_date_column_format
+__all__ += ["fix_date_column_format"]
