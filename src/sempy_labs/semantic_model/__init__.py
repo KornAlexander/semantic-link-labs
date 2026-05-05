@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Add_CalculatedTable_Calendar import add_calculated_calendar
+__all__ += ["add_calculated_calendar"]
