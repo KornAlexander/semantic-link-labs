@@ -2,8 +2,10 @@
 
 from typing import Optional
 from uuid import UUID
+from sempy._utils._log import log
 
 
+@log
 def fix_capitalize_object_names(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -64,8 +66,6 @@ def fix_capitalize_object_names(
                         h.Name = new_name
                         print(f"  Capitalized hierarchy: {new_name}")
                     fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would capitalize" if scan_only else "Capitalized"
     print(f"  {action} {fixed} object name(s).")
