@@ -26,6 +26,8 @@ def fix_disable_show_items_no_data(
     report : str | uuid.UUID
         Name or ID of the report.
     page_name : str, default=None
+        Note: This currently affects ALL pages report-wide; the parameter only filters the displayed `affected` summary, not the underlying mutation.
+page_name : str, default=None
         The display name of the page to apply changes to.
         Defaults to None which applies changes to all pages.
     workspace : str | uuid.UUID, default=None
