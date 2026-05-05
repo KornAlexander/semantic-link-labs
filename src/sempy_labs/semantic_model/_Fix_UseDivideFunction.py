@@ -9,10 +9,10 @@ from sempy._utils._log import log
 
 @log
 def fix_use_divide_function(
-    dataset: str,
+    dataset: str | UUID,
     workspace: Optional[str | UUID] = None,
     scan_only: bool = False,
-):
+) -> int:
     """
     Replaces simple division operators (/) in measure expressions with DIVIDE().
 
@@ -21,12 +21,17 @@ def fix_use_divide_function(
 
     Parameters
     ----------
-    dataset : str
-        Name of the semantic model.
+    dataset : str | UUID
+        Name or ID of the semantic model.
     workspace : str | uuid.UUID, default=None
         The Fabric workspace name or ID.
     scan_only : bool, default=False
         If True, only reports what would be fixed without making changes.
+
+    Returns
+    -------
+    int
+        Number of items fixed.
     """
     from sempy_labs.tom import connect_semantic_model
 
@@ -48,10 +53,7 @@ def fix_use_divide_function(
                 if expr.upper().count("DIVIDE") > expr.count("/"):
                     continue
                 # Simple replacement: ] / [ or ] / ( or ) / [
-                new_expr = re.sub(
-                    r'((?:\]\s*|\)\s*))\s*/\s*((?:\s*\[|\s*[A-Za-z]))',
-                    lambda match: f'DIVIDE({match.group(0).replace("/", ",", 1)})',
-                    expr,
+                new_expr = re.sub(r"\[([^\]]+)\]\s*/\s*\[([^\]]+)\]", r"DIVIDE([\1], [\2])", expr,
                     count=0,
                 )
                 if new_expr != expr:
