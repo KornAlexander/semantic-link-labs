@@ -3,8 +3,10 @@
 
 from typing import Optional
 from uuid import UUID
+from sempy._utils._log import log
 
 
+@log
 def fix_measure_descriptions(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -38,8 +40,6 @@ def fix_measure_descriptions(
                         m.Description = expr
                         print(f"  Fixed: [{m.Name}] — description set to DAX expression")
                     fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would fix" if scan_only else "Fixed"
     print(f"  {action} {fixed} measure description(s).")
