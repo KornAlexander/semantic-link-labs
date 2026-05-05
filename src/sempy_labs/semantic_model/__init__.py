@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_FloatingPointDataType import fix_floating_point_datatype
+__all__ += ["fix_floating_point_datatype"]
