@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_DiscourageImplicitMeasures import fix_discourage_implicit_measures
+__all__ += ["fix_discourage_implicit_measures"]
