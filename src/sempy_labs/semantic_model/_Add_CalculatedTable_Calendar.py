@@ -60,26 +60,26 @@ _BOOL_FMT = '"""TRUE"";""TRUE"";""FALSE"""'
 # Column definitions:
 #   (column_name, source_column, data_type, format_string, is_key, hidden, summarize_by, display_folder)
 _COLUMNS = [
-    ("Date",                        "CalcCalendar.[Date]",                        "DateTime", "Short Date",    True,  False, "None",    "1. Favorites"),
-    ("Month",                       "CalcCalendar.[Month]",                       "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
-    ("Fiscal Year",                 "CalcCalendar.[Fiscal Year]",                 "Int64",    "0",             False, False, "Sum",     "3. Fiscal Date\\2. Numbers;1. Favorites"),
-    ("Year",                        "CalcCalendar.[Year]",                        "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns;1. Favorites"),
-    ("Month (MMM)",                 "CalcCalendar.[Month (MMM)]",                 "String",   None,            False, False, "None",    "2. Calendar Date\\3. Text Columns;1. Favorites"),
-    ("Day",                         "CalcCalendar.[Day]",                         "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
-    ("Is Before This Month",        "CalcCalendar.[Is Before This Month]",        "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Current Fiscal Year",      "CalcCalendar.[Is Current Fiscal Year]",      "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Previous Fiscal Year",     "CalcCalendar.[Is Previous Fiscal Year]",     "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Current Calendar Year",    "CalcCalendar.[Is Current Calendar Year]",    "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Previous Calendar Year",   "CalcCalendar.[Is Previous Calendar Year]",   "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Current Month",            "CalcCalendar.[Is Current Month]",            "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Is Previous Month",           "CalcCalendar.[Is Previous Month]",           "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
-    ("Year Month Key",              "CalcCalendar.[Month Key]",                   "Int64",    "0",             False, False, "Count",   "2. Calendar Date\\2. Number Columns"),
-    ("Relative Month",              "CalcCalendar.[Relative Month]",              "Int64",    "0",             False, False, "Sum",     "4. Flags"),
-    ("Quarter",                     "CalcCalendar.[Quarter]",                     "String",   None,            False, False, "None",    "2. Calendar Date\\3. Text Columns"),
-    ("End of Month",                "CalcCalendar.[End of Month]",                "DateTime", "General Date",  False, False, "None",    "2. Calendar Date\\2. Number Columns"),
-    ("Week of Year",                "CalcCalendar.[Week of Year]",                "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
-    ("Weekday",                     "CalcCalendar.[Weekday]",                     "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
-    ("Is Current or Past Months",   "CalcCalendar.[Is Current or Past Month]",    "String",   None,            False, False, "None",    "4. Flags"),
+    ("Date",                        '[Date]',                        "DateTime", "Short Date",    True,  False, "None",    "1. Favorites"),
+    ("Month",                       '[Month]',                       "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
+    ("Fiscal Year",                 '[Fiscal Year]',                 "Int64",    "0",             False, False, "Sum",     "3. Fiscal Date\\2. Numbers;1. Favorites"),
+    ("Year",                        '[Year]',                        "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns;1. Favorites"),
+    ("Month (MMM)",                 '[Month (MMM)]',                 "String",   None,            False, False, "None",    "2. Calendar Date\\3. Text Columns;1. Favorites"),
+    ("Day",                         '[Day]',                         "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
+    ("Is Before This Month",        '[Is Before This Month]',        "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
+    ("Is Current Fiscal Year",      '[Is Current Fiscal Year]',      "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
+    ("Is Previous Fiscal Year",     '[Is Previous Fiscal Year]',     "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
+    ("Is Current Calendar Year",    '[Is Current Calendar Year]',    "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
+    ("Is Previous Calendar Year",   '[Is Previous Calendar Year]',   "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
+    ("Is Current Month",            '[Is Current Month]',            "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
+    ("Is Previous Month",           '[Is Previous Month]',           "Boolean",  _BOOL_FMT,       False, False, "None",    "4. Flags"),
+    ("Year Month Key",              '[Month Key]',                   "Int64",    "0",             False, False, "Count",   "2. Calendar Date\\2. Number Columns"),
+    ("Relative Month",              '[Relative Month]',              "Int64",    "0",             False, False, "Sum",     "4. Flags"),
+    ("Quarter",                     '[Quarter]',                     "String",   None,            False, False, "None",    "2. Calendar Date\\3. Text Columns"),
+    ("End of Month",                '[End of Month]',                "DateTime", "General Date",  False, False, "None",    "2. Calendar Date\\2. Number Columns"),
+    ("Week of Year",                '[Week of Year]',                "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
+    ("Weekday",                     '[Weekday]',                     "Int64",    "0",             False, False, "Sum",     "2. Calendar Date\\2. Number Columns"),
+    ("Is Current or Past Month",   '[Is Current or Past Month]',    "String",   None,            False, False, "None",    "4. Flags"),
 ]
 
 # Sort-by-column mappings: (column_name, sort_by_column_name)
@@ -293,8 +293,3 @@ def add_calculated_calendar(
         workspace=dataset_workspace_id,
     )
     print(f"{icons.green_dot} CalcCalendar table refreshed.")
-
-# Sample usage:
-# add_calculated_calendar(report="My Report")
-# add_calculated_calendar(report="My Report", workspace="My Workspace")
-# add_calculated_calendar(report="My Report", scan_only=True)
