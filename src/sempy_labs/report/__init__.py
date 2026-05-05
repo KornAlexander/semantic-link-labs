@@ -41,6 +41,7 @@ from ._items import (
     list_reports,
     get_report,
 )
+from ._Fix_DisableShowItemsNoData import fix_disable_show_items_no_data
 
 __all__ = [
     "create_report_from_reportjson",
@@ -66,7 +67,5 @@ __all__ = [
     "upgrade_to_pbir",
     "list_reports",
     "get_report",
+    "fix_disable_show_items_no_data",
 ]
-
-from ._Fix_DisableShowItemsNoData import fix_disable_show_items_no_data
-__all__ += ["fix_disable_show_items_no_data"]
