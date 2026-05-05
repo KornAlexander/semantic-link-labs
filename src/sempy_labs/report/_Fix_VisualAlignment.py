@@ -44,6 +44,11 @@ def fix_visual_alignment(
         Percentage tolerance for alignment detection. Visuals within this % of
         the page width/height are considered "nearly aligned" and will be snapped.
     """
+    # Validate inputs
+    if not 0 <= tolerance_pct <= 50:
+        raise ValueError(
+            f"tolerance_pct must be between 0 and 50, got {tolerance_pct}"
+        )
     from sempy_labs.report import connect_report
     total_fixes = 0
 
