@@ -3,6 +3,7 @@
 # Based on work by Lukasz Obst (update_prep_for_ai_via_apply_change.py).
 
 from __future__ import annotations
+from sempy._utils._log import log
 
 import json
 import time
@@ -512,6 +513,7 @@ def generate_prep_for_ai_text(
     return "\n".join(lines)
 
 
+@log
 def add_prep_for_ai(
     dataset: str | UUID,
     workspace: Optional[str | UUID] = None,
