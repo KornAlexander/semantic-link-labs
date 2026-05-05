@@ -102,7 +102,6 @@ def add_measure_table(
         )
 
         # 2. Save so the auto-generated column materialises
-        tom.model.SaveChanges()
 
         # 3. Hide the auto-generated column (typically named "Value")
         for col in tom.model.Tables[_MT_TABLE_NAME].Columns:
