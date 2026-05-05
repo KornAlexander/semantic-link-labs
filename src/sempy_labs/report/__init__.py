@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_LineChart import fix_line_chart
+__all__ += ["fix_line_chart"]
