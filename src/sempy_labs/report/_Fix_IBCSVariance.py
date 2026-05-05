@@ -6,7 +6,7 @@
 #   2. Identify AC measure (skip if multiple)
 #   3. Check/create PY, Δ PY, Max Green PY, Max Red AC measures
 #   4. Add PY to visual if missing
-#   5. Column→Bar for non-time axes (delegates to fix_column_to_bar logic)
+#   5. Column→Bar for non-time axes by directly switching the visual type
 #   6. Set error bars, overlap, labels, colors, axes, sorting
 #   7. Warn if no Year slicer on page
 
@@ -569,7 +569,14 @@ def fix_ibcs_variance(
     cal_created = False
     if cal_table is None:
         print(f"{icons.in_progress} No calendar table found — creating CalcCalendar...")
-        from sempy_labs.semantic_model._Add_CalculatedTable_Calendar import add_calculated_calendar
+        try:
+            from sempy_labs.semantic_model._Add_CalculatedTable_Calendar import add_calculated_calendar
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "No calendar table was found, and automatic calendar creation is not "
+                "available in this installation. Please add a calendar/date table manually "
+                "or upgrade sempy-labs to a version that includes add_calculated_calendar."
+            ) from exc
         add_calculated_calendar(report=report, workspace=workspace, scan_only=False)
         cal_table = "CalcCalendar"
         cal_date_col = "Date"
