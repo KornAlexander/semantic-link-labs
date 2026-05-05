@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_UseDivideFunction import fix_use_divide_function
+__all__ += ["fix_use_divide_function"]
