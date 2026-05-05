@@ -10,7 +10,8 @@ def fix_whole_number_format(
     scan_only: bool = False,
 ):
     """
-    Sets format string to #,0 on integer-typed measures without a format string.
+    Sets format string to #,0 on integer-typed measures (DataType=Int64) that
+    have neither a static FormatString nor a dynamic FormatStringDefinition.
 
     Parameters
     ----------
@@ -29,13 +30,15 @@ def fix_whole_number_format(
 
         for table in tom.model.Tables:
             for m in table.Measures:
+                # Only target measures that actually return an integer
+                if m.DataType != TOM.DataType.Int64:
+                    continue
+                # Skip measures with a dynamic format string
+                if m.FormatStringDefinition is not None:
+                    continue
+                # Skip measures that already have a static format string
                 fmt = str(m.FormatString) if m.FormatString else ""
                 if fmt.strip():
-                    continue  # already has a format
-                # Check if the measure likely returns an integer
-                # (heuristic: name doesn't suggest % or ratio)
-                name_lower = m.Name.lower()
-                if any(k in name_lower for k in ("%", "percent", "pct", "ratio", "rate")):
                     continue
                 if scan_only:
                     print(f"  Would fix: [{m.Name}] → #,0")
@@ -43,8 +46,7 @@ def fix_whole_number_format(
                     m.FormatString = "#,0"
                     print(f"  Fixed: [{m.Name}] → #,0")
                 fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
+        # Context manager (TOMWrapper.close) persists changes; no SaveChanges() needed.
 
     action = "Would fix" if scan_only else "Fixed"
     print(f"  {action} {fixed} measure(s).")
