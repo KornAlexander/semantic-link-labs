@@ -3,8 +3,10 @@
 
 from typing import Optional
 from uuid import UUID
+from sempy._utils._log import log
 
 
+@log
 def fix_mark_primary_keys(
     dataset: str,
     workspace: Optional[str | UUID] = None,
@@ -43,8 +45,6 @@ def fix_mark_primary_keys(
                 to_col.IsKey = True
                 print(f"  Marked: '{to_table.Name}'[{to_col.Name}] as primary key")
             fixed += 1
-        if not scan_only and fixed > 0:
-            tom.model.SaveChanges()
 
     action = "Would mark" if scan_only else "Marked"
     print(f"  {action} {fixed} primary key column(s).")
