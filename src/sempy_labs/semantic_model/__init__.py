@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_DataCategory import fix_data_category
+__all__ += ["fix_data_category"]
