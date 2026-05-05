@@ -41,6 +41,7 @@ from ._items import (
     list_reports,
     get_report,
 )
+from ._Fix_BarChart import fix_bar_chart
 
 __all__ = [
     "create_report_from_reportjson",
@@ -66,7 +67,5 @@ __all__ = [
     "upgrade_to_pbir",
     "list_reports",
     "get_report",
+    "fix_bar_chart",
 ]
-
-from ._Fix_BarChart import fix_bar_chart
-__all__ += ["fix_bar_chart"]
