@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_HideVisualFilters import fix_hide_visual_filters
+__all__ += ["fix_hide_visual_filters"]
