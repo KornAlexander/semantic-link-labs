@@ -41,6 +41,7 @@ from ._items import (
     list_reports,
     get_report,
 )
+from ._Fix_RemoveUnusedCustomVisuals import fix_remove_unused_custom_visuals
 
 __all__ = [
     "create_report_from_reportjson",
@@ -66,7 +67,5 @@ __all__ = [
     "upgrade_to_pbir",
     "list_reports",
     "get_report",
+    "fix_remove_unused_custom_visuals",
 ]
-
-from ._Fix_RemoveUnusedCustomVisuals import fix_remove_unused_custom_visuals
-__all__ += ["fix_remove_unused_custom_visuals"]
