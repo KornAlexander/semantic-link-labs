@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_PageSize import fix_page_size
+__all__ += ["fix_page_size"]
