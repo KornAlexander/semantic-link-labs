@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Add_Table_LastRefresh import add_last_refresh_table
+__all__ += ["add_last_refresh_table"]
