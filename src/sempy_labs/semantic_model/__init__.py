@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_MeasureDescriptions import fix_measure_descriptions
+__all__ += ["fix_measure_descriptions"]
