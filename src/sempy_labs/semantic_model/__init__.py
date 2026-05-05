@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_TrimObjectNames import fix_trim_object_names
+__all__ += ["fix_trim_object_names"]
