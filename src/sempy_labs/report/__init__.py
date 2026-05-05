@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_MigrateReportLevelMeasures import fix_migrate_report_level_measures
+__all__ += ["fix_migrate_report_level_measures"]
