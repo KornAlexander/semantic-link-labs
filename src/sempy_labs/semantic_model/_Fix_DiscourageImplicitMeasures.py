@@ -79,9 +79,3 @@ def fix_discourage_implicit_measures(
             f"{icons.green_dot} DiscourageImplicitMeasures has been set to True "
             f"on '{dataset_name}'."
         )
-
-
-# Sample usage:
-# fix_discourage_implicit_measures(report="My Report")
-# fix_discourage_implicit_measures(report="My Report", workspace="My Workspace")
-# fix_discourage_implicit_measures(report="My Report", scan_only=True)
