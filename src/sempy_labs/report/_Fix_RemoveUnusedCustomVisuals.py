@@ -24,6 +24,8 @@ def fix_remove_unused_custom_visuals(
     report : str | uuid.UUID
         Name or ID of the report.
     page_name : str, default=None
+        Note: This parameter currently has no effect; the underlying wrapper operates on the entire report.
+page_name : str, default=None
         Ignored (custom visuals are report-level). Kept for API consistency.
     workspace : str | uuid.UUID, default=None
         The Fabric workspace name or ID.
