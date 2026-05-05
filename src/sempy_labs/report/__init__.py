@@ -67,3 +67,6 @@ __all__ = [
     "list_reports",
     "get_report",
 ]
+
+from ._Fix_RemoveUnusedCustomVisuals import fix_remove_unused_custom_visuals
+__all__ += ["fix_remove_unused_custom_visuals"]
