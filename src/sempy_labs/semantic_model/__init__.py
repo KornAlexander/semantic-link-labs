@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_WholeNumberFormat import fix_whole_number_format
+__all__ += ["fix_whole_number_format"]
