@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Add_MeasuresFromColumns import add_measures_from_columns
+__all__ += ["add_measures_from_columns"]
