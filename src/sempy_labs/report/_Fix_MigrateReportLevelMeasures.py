@@ -17,6 +17,8 @@ def fix_migrate_report_level_measures(
 ) -> None:
     """
     Migrates report-level measures from the report into the semantic model.
+
+    Note: The current implementation does not preserve the `Data Category` of report-level measures (e.g. Web URL, Image URL); these will be reset to default after migration.
     It is a best practice to keep measures defined in the semantic model,
     not in the report.
 
