@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Add_PYMeasures import add_py_measures
+__all__ += ["add_py_measures"]
