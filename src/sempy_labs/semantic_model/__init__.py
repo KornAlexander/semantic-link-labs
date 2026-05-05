@@ -13,3 +13,6 @@ __all__ = [
     "make_discoverable",
     "enable_query_caching",
 ]
+
+from ._Fix_IsAvailableInMdxTrue import fix_isavailable_in_mdx_true
+__all__ += ["fix_isavailable_in_mdx_true"]
